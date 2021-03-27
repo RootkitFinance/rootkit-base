@@ -58,19 +58,18 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     mapping (address => uint256) public liquiditySupply;
     address public mustUpdate;
 
-    FeeSplitter feeSplitter;
-    uint16 feesRate; 
-    uint16 sellFeesRate;
+    FeeSplitter public feeSplitter;
+    uint16 public feesRate; 
+    uint16 public sellFeesRate;
     address public taxedPool;
    
     uint16 public dumpTaxStartRate; 
     uint256 public dumpTaxDurationInSeconds;
     uint256 public dumpTaxEndTimestamp;
 
-    constructor(IERC31337 _rootedToken, address _taxedPool, IUniswapV2Router02 _uniswapV2Router)
+    constructor(IERC31337 _rootedToken, IUniswapV2Router02 _uniswapV2Router)
     {
         rootedToken = _rootedToken;
-        taxedPool = _taxedPool;
         uniswapV2Router = _uniswapV2Router;
         uniswapV2Factory = IUniswapV2Factory(_uniswapV2Router.factory());
     }
@@ -108,6 +107,14 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         require (unrestrictedControllers[msg.sender], "Not an unrestricted controller");
         unrestricted = _unrestricted;
     }    
+
+    function setTaxedPool(address _taxedPool) public ownerOnly()
+    {
+        if (taxedPool == address(0))
+        {
+            taxedPool = _taxedPool;
+        }
+    }
 
     function setDumpTax(uint16 startTaxRate, uint256 durationInSeconds) public
     {
