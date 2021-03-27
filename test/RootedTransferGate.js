@@ -20,7 +20,7 @@ const { createUniswap } = require("./helpers");
         rootedEliteLp = uniswap.pairFor(rootedEliteAddress);
 
         const rootedTransferGateFactory = await ethers.getContractFactory("RootedTransferGate");        
-        rootedTransferGate = await rootedTransferGateFactory.connect(owner).deploy(rooted.address, rootedEliteLp.address, uniswap.router.address);
+        rootedTransferGate = await rootedTransferGateFactory.connect(owner).deploy(rooted.address, uniswap.router.address);
         
         await rooted.connect(owner).setTransferGate(rootedTransferGate.address);        
     });

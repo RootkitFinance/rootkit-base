@@ -110,10 +110,8 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
 
     function setTaxedPool(address _taxedPool) public ownerOnly()
     {
-        if (taxedPool == address(0))
-        {
-            taxedPool = _taxedPool;
-        }
+        require (taxedPool == address(0), "Taxed pool aready set");
+        taxedPool = _taxedPool;
     }
 
     function setDumpTax(uint16 startTaxRate, uint256 durationInSeconds) public
