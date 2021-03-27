@@ -14,14 +14,54 @@ contract FeeSplitter is TokensRecoverable
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
     using Address for address;
+    uint256 devRateMin = 1000;  // 10% of overall fees
+    uint256 rootRateMin = 1000; // 10% of overall fees
+    address public devAddress;
+    address public rootFeederAddress;
 
     mapping (IGatedERC20 => address[]) public feeCollectors;
     mapping (IGatedERC20 => uint256[]) public feeRates;
     mapping (IGatedERC20 => uint256) public burnRates;
 
+    mapping (address => bool) public devAddressControllers;
+
+    constructor(address _devAddress, address _rootFeederAddress)
+    {
+        devAddressControllers[msg.sender] = true;
+        devAddress = _devAddress;
+        rootFeederAddress = _rootFeederAddress;
+    }
+
+    function setDevAddressController(address controllers, bool allow) public
+    {
+        require (devAddressControllers[msg.sender], "Not a Dev Address Controllers");
+        devAddressControllers[controllers] = allow;
+    }
+
+    function setDevAddress(address _devAddress) public
+    {
+        require (devAddressControllers[msg.sender], "Not a Dev Address Controller");
+        devAddress = _devAddress;
+    }
+
+    function setRootFeederAddress(address _rootFeederAddress) public ownerOnly()
+    {
+        rootFeederAddress = _rootFeederAddress;
+    }
+
     function setFees(IGatedERC20 token, uint256 burnRate, address[] memory collectors, uint256[] memory rates) public ownerOnly() // 100% = 10000
     {
-        require (collectors.length == rates.length && collectors.length > 0, "Fee Collectors and Rates should be the same size and not empty");
+        require (collectors.length == rates.length && collectors.length > 1, "Fee Collectors and Rates must be the same size and contain at least 2 elements");
+        require (collectors[0] == devAddress && collectors[1] == rootFeederAddress, "First address must be dev address, second address must be rootFeederAddress");
+        require (rates[0] >= devRateMin && rates[1] >= rootRateMin, "First rate must be greater or equal to devRateMin and second rate must be greater or equal to rootRateMin");
+        
+        uint256 totalRate = burnRate;
+        for (uint256 i = 0; i < rates.length; i++)
+        {
+            totalRate = totalRate + rates[i];
+        }
+
+        require (totalRate == 10000, "Total fee rate must be 100%");
         
         if (token.balanceOf(address(this)) > 0)
         {

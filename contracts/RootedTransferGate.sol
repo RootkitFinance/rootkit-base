@@ -67,7 +67,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     uint256 public dumpTaxDurationInSeconds;
     uint256 public dumpTaxEndTimestamp;
 
-    constructor(IERC31337 _rootedToken,  address _taxedPool, IUniswapV2Router02 _uniswapV2Router)
+    constructor(IERC31337 _rootedToken, address _taxedPool, IUniswapV2Router02 _uniswapV2Router)
     {
         rootedToken = _rootedToken;
         taxedPool = _taxedPool;
@@ -156,36 +156,6 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         addressStates[pool] = AddressState.AllowedPool;
         allowedPoolTokens.push(token);
         liquiditySupply[pool] = IERC20(pool).totalSupply();
-    }
-
-    function safeAddLiquidity(IERC20 token, uint256 tokenAmount, uint256 rootKitAmount, uint256 minTokenAmount, uint256 minRootKitAmount, address to, uint256 deadline) public
-        returns (uint256 rootKitUsed, uint256 tokenUsed, uint256 liquidity)
-    {
-        address pool = uniswapV2Factory.getPair(address(rootedToken), address(token));
-        require (pool != address(0) && addressStates[pool] == AddressState.AllowedPool, "Pool not approved");
-        require (!unrestricted);
-        unrestricted = true;
-
-        uint256 tokenBalance = token.balanceOf(address(this));
-        token.safeTransferFrom(msg.sender, address(this), tokenAmount);
-        rootedToken.transferFrom(msg.sender, address(this), rootKitAmount);
-        rootedToken.approve(address(uniswapV2Router), rootKitAmount);
-        token.safeApprove(address(uniswapV2Router), tokenAmount);
-        (rootKitUsed, tokenUsed, liquidity) = uniswapV2Router.addLiquidity(address(rootedToken), address(token), rootKitAmount, tokenAmount, minRootKitAmount, minTokenAmount, to, deadline);
-        liquiditySupply[pool] = IERC20(pool).totalSupply();
-        if (mustUpdate == pool) {
-            mustUpdate = address(0);
-        }
-
-        if (rootKitUsed < rootKitAmount) {
-            rootedToken.transfer(msg.sender, rootKitAmount - rootKitUsed);
-        }
-        tokenBalance = token.balanceOf(address(this)).sub(tokenBalance); // we do it this way in case there's a burn
-        if (tokenBalance > 0) {
-            token.safeTransfer(msg.sender, tokenBalance);
-        }
-        
-        unrestricted = false;
     }
 
     function handleTransfer(address, address from, address to, uint256 amount) public virtual override returns (address, uint256)
