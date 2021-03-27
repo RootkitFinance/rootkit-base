@@ -80,11 +80,13 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     IMarketGeneration marketGeneration;
     uint256 recoveryDate = block.timestamp + 2592000; // 1 Month
     
-    uint16 constant public devCutPercent = 800; // 8%
-    uint16 constant public prePreBuyForShillsPercent = 200; // 2%
+    uint16 constant public devCutPercent = 900; // 9%
+    uint16 constant public preBuyForShillsPercent = 200; // 2%
+    uint16 constant public preBuyMarketManipulationPercent = 900; // 9%
     uint256 public override generationEndTime;
     uint256 public override vestingEnd; // 7 days
     uint256 public vestingDuration = 600000 seconds;
+    uint256 rootedBottom;
 
     constructor(RootedToken _rootedToken, IUniswapV2Router02 _uniswapV2Router, IERC31337 _eliteToken, address _devAddress)
     {
@@ -151,21 +153,36 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         createRootedEliteLiquidity();
 
         eliteToken.sweepFloor(address(this));
+        eliteToken.depositTokens(baseToken.balanceOf(address(this)));  
 
         uint256 devCut = totalBaseTokenCollected * devCutPercent / 10000;
-        baseToken.safeTransfer(devAddress, devCut);
-        
-        eliteToken.depositTokens(baseToken.balanceOf(address(this)));  
-        
-        prePreRefShillBuy();
-
-        preBuyForGroup();
+        buyTheBottom(devCut);       
+       
+        preBuyMarketManipulation();
+        preBuyRefShill();
+        preBuyForGroups();
 
         eliteToken.transfer(devAddress, eliteToken.balanceOf(address(this))); // pump fund, send direct to bobber in future
 
         createRootedBaseLiquidity();
+        sellTheTop();
 
         gate.setUnrestricted(false);
+    }
+
+    
+    function buyTheBottom(uint256 devCut) private
+    {
+        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(devCut, 0, eliteRootedPath(), address(this), block.timestamp);
+        rootedBottom = amounts[1];
+    }
+
+    function sellTheTop() private
+    {
+        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(rootedBottom, 0, rootedElitePath(), address(this), block.timestamp);
+        uint256 eliteAmount = amounts[1];
+        eliteToken.withdrawTokens(eliteAmount);
+        baseToken.safeTransfer(devAddress, eliteAmount);
     }
     
     function createRootedEliteLiquidity() private
@@ -175,14 +192,22 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         uniswapV2Router.addLiquidity(address(eliteToken), address(rootedToken), eliteToken.balanceOf(address(this)), rootedToken.totalSupply(), 0, 0, address(this), block.timestamp);
     }
 
-    function prePreRefShillBuy() private 
+    function preBuyMarketManipulation() private 
     {
-        uint256 amount = totalBaseTokenCollected * prePreBuyForShillsPercent / 10000; // buy at best possible price to feed the shillage.
+        uint256 amount = totalBaseTokenCollected * preBuyMarketManipulationPercent / 10000; 
+        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
+        uint256 rootedAmout = amounts[1];
+        rootedToken.transfer(devAddress, rootedAmout); // send to Bobber
+    }
+    
+    function preBuyRefShill() private 
+    {
+        uint256 amount = totalBaseTokenCollected * preBuyForShillsPercent / 10000; // buy at best possible price to feed the shillage.
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
         totalBoughtForReferral = amounts[1];
     }
 
-    function preBuyForGroup() private 
+    function preBuyForGroups() private 
     {          
         for(uint8 round = 1; round <= marketGeneration.buyRoundsCount(); round++)
         {
@@ -213,6 +238,14 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         address[] memory path = new address[](2);
         path[0] = address(eliteToken);
         path[1] = address(rootedToken);
+        return path;
+    }
+
+    function rootedElitePath() private view returns (address[] memory)
+    {
+        address[] memory path = new address[](2);
+        path[0] = address(rootedToken);
+        path[1] = address(eliteToken);
         return path;
     }
 
