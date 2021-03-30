@@ -74,15 +74,16 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     IUniswapV2Pair rootedBaseLP;
 
     uint256 public totalBaseTokenCollected;
-    mapping (uint8 => uint256) totalRootedTokenBoughtPerRound;
-    mapping (address => mapping (uint8 => uint256)) public claimTime; // address > round > time
-    uint256 public totalBoughtForReferral;
+    mapping (uint8 => uint256) public totalRootedTokenBoughtPerRound;
+    mapping (address => uint256) public claimTime; // address > time    
+    mapping (address => uint256) public totalOwed;
+    uint256 public totalBoughtForReferrals;
     IMarketGeneration marketGeneration;
-    uint256 recoveryDate = block.timestamp + 2592000; // 1 Month
+    uint256 public recoveryDate = block.timestamp + 2592000; // 1 Month
     
     uint16 constant public devCutPercent = 900; // 9%
-    uint16 constant public preBuyForShillsPercent = 200; // 2%
-    uint16 constant public preBuyMarketManipulationPercent = 900; // 9%
+    uint16 constant public preBuyForReferralsPercent = 200; // 2%
+    uint16 constant public preBuyForMarketManipulationPercent = 900; // 9%
     uint256 public override generationEndTime;
     uint256 public override vestingEnd; // 7 days
     uint256 public vestingDuration = 600000 seconds;
@@ -145,8 +146,9 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         distributionComplete = true;
         totalBaseTokenCollected = totalContributions;
         baseToken.safeTransferFrom(msg.sender, address(this), totalBaseTokenCollected);
-        rootedToken.transferFrom(msg.sender, address(this), rootedToken.totalSupply());
         
+        rootedToken.mint(totalBaseTokenCollected);
+
         RootedTransferGate gate = RootedTransferGate(address(rootedToken.transferGate()));
         gate.setUnrestricted(true);
 
@@ -155,21 +157,20 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         eliteToken.sweepFloor(address(this));
         eliteToken.depositTokens(baseToken.balanceOf(address(this)));  
 
-        uint256 devCut = totalBaseTokenCollected * devCutPercent / 10000;
-        buyTheBottom(devCut);       
-       
-        preBuyMarketManipulation();
-        preBuyRefShill();
+        uint256 devCut = totalBaseTokenCollected * devCutPercent / 10000;        
+        buyTheBottom(devCut);     
+
+        preBuyForMarketManipulation();
+        preBuyForReferrals();
         preBuyForGroups();
 
         eliteToken.transfer(devAddress, eliteToken.balanceOf(address(this))); // pump fund, send direct to bobber in future
 
-        createRootedBaseLiquidity();
         sellTheTop();
+        createRootedBaseLiquidity();
 
         gate.setUnrestricted(false);
     }
-
     
     function buyTheBottom(uint256 devCut) private
     {
@@ -192,43 +193,49 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         uniswapV2Router.addLiquidity(address(eliteToken), address(rootedToken), eliteToken.balanceOf(address(this)), rootedToken.totalSupply(), 0, 0, address(this), block.timestamp);
     }
 
-    function preBuyMarketManipulation() private 
+    function preBuyForMarketManipulation() private 
     {
-        uint256 amount = totalBaseTokenCollected * preBuyMarketManipulationPercent / 10000; 
+        uint256 amount = totalBaseTokenCollected * preBuyForMarketManipulationPercent / 10000;        
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
         uint256 rootedAmout = amounts[1];
         rootedToken.transfer(devAddress, rootedAmout); // send to Bobber
     }
     
-    function preBuyRefShill() private 
+    function preBuyForReferrals() private 
     {
-        uint256 amount = totalBaseTokenCollected * preBuyForShillsPercent / 10000; // buy at best possible price to feed the shillage.
+        uint256 amount = totalBaseTokenCollected * preBuyForReferralsPercent / 10000; // buy at best possible price to feed the shillage.
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
-        totalBoughtForReferral = amounts[1];
+        totalBoughtForReferrals = amounts[1];
     }
 
     function preBuyForGroups() private 
     {          
-        for(uint8 round = 1; round <= marketGeneration.buyRoundsCount(); round++)
+        for (uint8 round = 1; round <= marketGeneration.buyRoundsCount(); round++)
         {
-            uint256 totalRound = marketGeneration.roundTotals(round);
+            uint256 totalRound = marketGeneration.totalContributionPerRound(round);
             uint256 buyPercent = round * 3000; // 10000 = 100%
             uint256 roundBuy = totalRound * buyPercent / 10000;
-            
-            uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(roundBuy, 0, eliteRootedPath(), address(this), block.timestamp);
-            totalRootedTokenBoughtPerRound[round] = amounts[1];
+
+            if (roundBuy > 0)
+            {                
+                uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(roundBuy, 0, eliteRootedPath(), address(this), block.timestamp);
+                totalRootedTokenBoughtPerRound[round] = amounts[1];
+            }            
         }
     }
 
     function createRootedBaseLiquidity() private
     {
         uint256 elitePerLpToken = eliteToken.balanceOf(address(rootedEliteLP)).mul(1e18).div(rootedEliteLP.totalSupply());
-        uint256 LPsToMove = baseToken.balanceOf(address(eliteToken)).mul(1e18).div(elitePerLpToken);
-
-        (uint256 eliteAmount, uint256 rootedAmount) = uniswapV2Router.removeLiquidity(address(eliteToken), address(rootedToken), LPsToMove, 0, 0, address(this), block.timestamp);
-
-        eliteToken.withdrawTokens(eliteAmount);
-        uniswapV2Router.addLiquidity(address(baseToken), address(rootedToken), eliteAmount, rootedAmount, 0, 0, address(this), block.timestamp);
+        uint256 lpAmountToRemove = baseToken.balanceOf(address(eliteToken)).mul(1e18).div(elitePerLpToken);
+       
+        (uint256 eliteAmount, uint256 rootedAmount) = uniswapV2Router.removeLiquidity(address(eliteToken), address(rootedToken), lpAmountToRemove, 0, 0, address(this), block.timestamp);
+        
+        uint256 baseInElite = baseToken.balanceOf(address(eliteToken));
+        uint256 baseAmount = eliteAmount > baseInElite ? baseInElite : eliteAmount;
+        
+        eliteToken.withdrawTokens(baseInElite);
+        uniswapV2Router.addLiquidity(address(baseToken), address(rootedToken), baseAmount, rootedAmount, 0, 0, address(this), block.timestamp);
         rootedBaseLP.transfer(devAddress, rootedBaseLP.balanceOf(address(this)));
         rootedEliteLP.transfer(devAddress, rootedEliteLP.balanceOf(address(this)));
     }
@@ -248,43 +255,52 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         path[1] = address(eliteToken);
         return path;
     }
-
-    function claim(address to, uint256 contribution, uint8 round) public override 
+    
+    function getTotalOwed(address account) private view returns (uint256)
     {
-        require (msg.sender == address(marketGeneration), "Unauthorized");
+        uint256 total;
 
-        uint256 totalRound = marketGeneration.roundTotals(round);
+        for (uint8 round = 1; round <= marketGeneration.buyRoundsCount(); round++)
+        {           
+            uint256 contribution = marketGeneration.contributionPerRound(account, round);
 
-        // Send rootedToken
-        RootedTransferGate gate = RootedTransferGate(address(rootedToken.transferGate()));
-        gate.setUnrestricted(true);
+            if (contribution > 0)
+            {
+                uint256 totalRound = marketGeneration.totalContributionPerRound(round);
+                uint256 share = contribution.mul(totalRootedTokenBoughtPerRound[round]) / totalRound;
+                total = total + share;
+            }           
+        }
 
-        uint256 share = contribution.mul(totalRootedTokenBoughtPerRound[round]) / totalRound;
-
-        uint256 endTime = vestingEnd > block.timestamp ? block.timestamp : vestingEnd;
-        require (claimTime[to][round] <= endTime, "Already claimed");
-        uint256 claimStartTime = claimTime[to][round] == 0 ? generationEndTime : claimTime[to][round];
-        share = (endTime.sub(claimStartTime)).mul(share).div(vestingDuration);        
-
-        claimTime[to][round] = block.timestamp;
-
-        rootedToken.transfer(to, share);
-
-        gate.setUnrestricted(false);
+        return total;
     }
 
-    function claimRefRewards(address to, uint256 refShare) public override 
+    function claim(address account) public override 
     {
         require (msg.sender == address(marketGeneration), "Unauthorized");
 
-        RootedTransferGate gate = RootedTransferGate(address(rootedToken.transferGate()));
-        gate.setUnrestricted(true);
+        if (totalOwed[account] == 0)
+        {
+            totalOwed[account] = getTotalOwed(account);
+        }
 
-        uint256 share = refShare.mul(totalBoughtForReferral).div(marketGeneration.totalRefPoints());
+        uint256 share = totalOwed[account];  
+        uint256 endTime = vestingEnd > block.timestamp ? block.timestamp : vestingEnd;
 
-        rootedToken.transfer(to, share);
+        require (claimTime[account] <= endTime, "Already claimed");
 
-        gate.setUnrestricted(false);
+        uint256 claimStartTime = claimTime[account] == 0 ? generationEndTime : claimTime[account];
+        share = (endTime.sub(claimStartTime)).mul(share).div(vestingDuration);        
+        claimTime[account] = block.timestamp;
+        rootedToken.transfer(account, share);
+    }
+
+    function claimReferralRewards(address account, uint256 referralShare) public override 
+    {
+        require (msg.sender == address(marketGeneration), "Unauthorized");
+
+        uint256 share = referralShare.mul(totalBoughtForReferrals).div(marketGeneration.totalReferralPoints());
+        rootedToken.transfer(account, share);
     }
 
     function canRecoverTokens(IERC20 token) internal override view returns (bool) 

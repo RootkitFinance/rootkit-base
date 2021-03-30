@@ -17,11 +17,19 @@ Its time to ROOT EVERYTHING ON EVERY CHAIN!!
 
 import "./GatedERC20.sol";
 
-
 contract RootedToken is GatedERC20("RootKit", "ROOT")
 {
-    constructor()
+    address public minter;
+
+    function setMinter(address _minter) public ownerOnly()
     {
-        _mint(msg.sender, 1000000 ether);
+        minter = _minter;
+    }
+
+    function mint(uint256 amount) public
+    {
+        require(msg.sender == minter, "Not a minter");
+        require(this.totalSupply() == 0, "Already minted");
+        _mint(msg.sender, amount);
     }
 }

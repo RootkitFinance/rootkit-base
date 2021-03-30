@@ -12,7 +12,7 @@ describe("MarketDistribution", function() {
         
         const rootedTokenFactory = await ethers.getContractFactory("RootedToken");
         rootedToken = await rootedTokenFactory.connect(owner).deploy();
-        const baseTokenFactory = await ethers.getContractFactory("ERC20Test");
+        const baseTokenFactory = await ethers.getContractFactory("Tether");
         baseToken = await baseTokenFactory.connect(owner).deploy();
         const eliteTokenFactory = await ethers.getContractFactory("EliteToken");
         eliteToken = await eliteTokenFactory.connect(owner).deploy(baseToken.address);
@@ -34,7 +34,7 @@ describe("MarketDistribution", function() {
         const eliteFloorCalculator = await eliteFloorCalculatorFactory.connect(owner).deploy(rootedToken.address, uniswap.factory.address);
         await eliteToken.connect(owner).setFloorCalculator(eliteFloorCalculator.address);
 
-        await rootedToken.connect(owner).transfer(marketGeneration.address, await rootedToken.totalSupply());
+        await rootedToken.connect(owner).setMinter(marketDistribution.address);
         await marketGeneration.connect(owner).activate(marketDistribution.address);
         
         await baseToken.connect(owner).transfer(user1.address, utils.parseEther("1"));
@@ -47,42 +47,63 @@ describe("MarketDistribution", function() {
                 
         await marketGeneration.connect(user1).contribute(utils.parseEther("1"), 1, constants.AddressZero);
         await marketGeneration.connect(user2).contribute(utils.parseEther("2"), 2, constants.AddressZero);
-        await marketGeneration.connect(user3).contribute(utils.parseEther("3"), 3, constants.AddressZero);
+        await marketGeneration.connect(user3).contribute(utils.parseEther("3"), 3, user1.address);
     })
 
     it("initializes as expected", async function() {
         expect(await marketDistribution.totalBaseTokenCollected()).to.equal(0);
         expect(await marketDistribution.devCutPercent()).to.equal(900);
-        expect(await marketDistribution.preBuyForShillsPercent()).to.equal(200);
-        expect(await marketDistribution.preBuyMarketManipulationPercent()).to.equal(900);
+        expect(await marketDistribution.preBuyForReferralsPercent()).to.equal(200);
+        expect(await marketDistribution.preBuyForMarketManipulationPercent()).to.equal(900);
+        expect(await uniswap.factory.getPair(eliteToken.address, rootedToken.address)).to.equal(constants.AddressZero);
+        expect(await uniswap.factory.getPair(baseToken.address, rootedToken.address)).to.equal(constants.AddressZero);
     })
 
-    // it("completeSetup() can't be called by non-owner", async function() {
-    //     await expect(marketDistribution.connect(user1).completeSetup()).to.be.revertedWith("Owner only");
-    // })
+    it("completeSetup() can't be called by non-owner", async function() {
+        await expect(marketDistribution.connect(user1).completeSetup()).to.be.revertedWith("Owner only");
+    })
 
-    // describe("setupEliteRooted(), setupBaseRooted(), completeSetup(), complete() called", function() {
+    describe("setupEliteRooted(), setupBaseRooted(), completeSetup(), complete() called", function() {
 
-    //     beforeEach(async function() {
-    //         await marketDistribution.connect(owner).setupEliteRooted();
-    //         await marketDistribution.connect(owner).setupBaseRooted();
-    //         await marketDistribution.connect(owner).completeSetup();
-           
-    //         //await marketGeneration.connect(owner).complete();
-    //     })
+        beforeEach(async function() {
+            await marketDistribution.connect(owner).setupEliteRooted();
+            await marketDistribution.connect(owner).setupBaseRooted();
+            await marketDistribution.connect(owner).completeSetup();           
+            await marketGeneration.connect(owner).complete();            
+        })
 
-    //     it("initialized as expected", async function() {                    
-    //         // expect(await rootKitDistribution.totalEthCollected()).to.equal(utils.parseEther("6"));
-    //         // expect(await rootKitDistribution.totalRootKitBought()).not.to.equal(0);
-    //         // expect(await rootKitDistribution.totalWbtcRootKit()).not.to.equal(0);
-    //         // expect(await rootKitDistribution.totalKethRootKit()).not.to.equal(0);
-    //     })
+        it("initialized as expected", async function() {                    
+            expect(await marketDistribution.totalBaseTokenCollected()).to.equal(utils.parseEther("6"));
+            expect(await rootedToken.totalSupply()).to.equal(utils.parseEther("6"));
+            expect(await uniswap.factory.getPair(eliteToken.address, rootedToken.address)).not.to.equal(constants.AddressZero);
+            expect(await uniswap.factory.getPair(baseToken.address, rootedToken.address)).not.to.equal(constants.AddressZero);
+        })
 
-    //     it("distributed as expected", async function() {         
-    //         // const target = BigNumber.from(utils.parseEther("1.5"));
-    //         // expect(BigNumber.from(await weth.balanceOf(owner.address)).gt(target)).to.equal(true);
-    //         // expect(BigNumber.from(await weth.balanceOf(rootKitVault.address)).eq(target)).to.equal(true);
-    //         // expect(await ethers.provider.getBalance(rootKitDistribution.address)).to.equal(0);
-    //     })
-    // })
+        it("distributed as expected", async function() {
+            expect(await marketDistribution.totalBoughtForReferrals()).not.to.equal(0);
+            expect(await rootedToken.balanceOf(dev.address)).not.to.equal(0);
+            expect(await baseToken.balanceOf(dev.address)).not.to.equal(0);
+            expect(await marketDistribution.totalRootedTokenBoughtPerRound(1)).not.to.equal(0);
+            expect(await marketDistribution.totalRootedTokenBoughtPerRound(2)).not.to.equal(0);
+            expect(await marketDistribution.totalRootedTokenBoughtPerRound(3)).not.to.equal(0);
+        })
+
+        it("claim works as expected", async function() {
+            await marketGeneration.connect(user1).claim();
+            await marketGeneration.connect(user2).claim();
+            await marketGeneration.connect(user3).claim();
+
+            expect(await rootedToken.balanceOf(user1.address)).not.to.equal(0);
+            expect(await rootedToken.balanceOf(user2.address)).not.to.equal(0);
+            expect(await rootedToken.balanceOf(user3.address)).not.to.equal(0);
+        })
+
+        it("claimRefRewards works as expected", async function() {
+            await marketGeneration.connect(user1).claimReferralBonus();
+            await marketGeneration.connect(user3).claimReferralBonus();
+
+            expect(await rootedToken.balanceOf(user1.address)).not.to.equal(0);
+            expect(await rootedToken.balanceOf(user3.address)).not.to.equal(0);
+        })
+    })
 })

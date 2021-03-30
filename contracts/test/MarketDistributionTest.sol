@@ -6,6 +6,7 @@ import "../IERC20.sol";
 import "../SafeERC20.sol";
 import "../RootedToken.sol";
 import "../IMarketDistribution.sol";
+import "../IMarketGeneration.sol";
 
 contract MarketDistributionTest is IMarketDistribution
 {
@@ -14,9 +15,10 @@ contract MarketDistributionTest is IMarketDistribution
     RootedToken immutable rootedToken;
     IERC20 immutable baseToken;
 
-    mapping (address => mapping (uint8 => uint256)) public claimCallAmount;
-    mapping (address => uint256) public claimRefBonusCallAmount;
+    mapping (address => uint256) public claimCallAmount;
+    mapping (address => uint256) public claimReferralBonusCallAmount;
     bool public override distributionComplete;
+    IMarketGeneration public marketGeneration; 
 
     constructor(RootedToken _rootedToken, IERC20 _baseToken)
     {
@@ -27,21 +29,21 @@ contract MarketDistributionTest is IMarketDistribution
     function distribute() public override 
     { 
         require (!distributionComplete, "Already complete");
+        marketGeneration = IMarketGeneration(msg.sender);
         distributionComplete = true;
         baseToken.safeTransferFrom(msg.sender, address(this), baseToken.balanceOf(msg.sender));
-        rootedToken.transferFrom(msg.sender, address(this), rootedToken.totalSupply());
     }
 
-    function claim(address to, uint256 contribution, uint8 round) public override
+    function claim(address account) public override
     {
         require (distributionComplete, "Not complete");
-        claimCallAmount[to][round] = contribution;
+        claimCallAmount[account] = marketGeneration.totalContribution(account);
     }
 
-    function claimRefRewards(address to, uint256 refShare) public override
+    function claimReferralRewards(address account, uint256 referralShare) public override
     {
         require (distributionComplete, "Not complete");
-        claimRefBonusCallAmount[to] = refShare;
+        claimReferralBonusCallAmount[account] = referralShare;
     }
 
     function generationEndTime() public override view returns (uint256) 

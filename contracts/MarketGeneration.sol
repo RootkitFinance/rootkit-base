@@ -14,11 +14,12 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    mapping (address => mapping (uint8 => uint256)) public contribution; // address > round > amount 
-    mapping (uint8 => uint256) public override roundTotals; // total contributed to each buy round
-    mapping (address => uint256) public override refPoints; // address > amount
-    uint256 public override totalRefPoints;
-    address public devAddr;
+    mapping (address => mapping (uint8 => uint256)) public override contributionPerRound; // address > round > amount 
+    mapping (address => uint256) public override totalContribution; // address > amount 
+    mapping (uint8 => uint256) public override totalContributionPerRound; // total contributed to each buy round
+    mapping (address => uint256) public override referralPoints; // address > amount
+    uint256 public override totalReferralPoints;
+    address public devAddress;
 
     bool public isActive;
 
@@ -35,7 +36,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         rootedToken = _rootedToken;
         baseToken = _baseToken;
         hardCap = _hardCap;
-        devAddr = _devAddr;
+        devAddress = _devAddr;
     }
 
     modifier active()
@@ -47,7 +48,6 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     function activate(IMarketDistribution _marketDistribution) public ownerOnly()
     {
         require (!isActive && block.timestamp >= refundsAllowedUntil, "Already activated");        
-        require (rootedToken.balanceOf(address(this)) == rootedToken.totalSupply(), "Missing supply");
         require (address(_marketDistribution) != address(0));
         marketDistribution = _marketDistribution;
         isActive = true;
@@ -81,79 +81,74 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         refundsAllowedUntil = uint256(-1);
     }
 
-    function claim(uint8 round) public 
+    function claim() public 
     {
-        uint256 amount = contribution[msg.sender][round];
+        uint256 amount = totalContribution[msg.sender];
 
         require (amount > 0, "Nothing to claim");
         
         if (refundsAllowedUntil > block.timestamp) 
         {
             baseToken.safeTransfer(msg.sender, amount);
-            contribution[msg.sender][round] = 0;
+            totalContribution[msg.sender] = 0;
+            contributionPerRound[msg.sender][1] = 0;
+            contributionPerRound[msg.sender][2] = 0;
+            contributionPerRound[msg.sender][3] = 0;
         }
         else 
         {
-            marketDistribution.claim(msg.sender, amount, round);
+            marketDistribution.claim(msg.sender);
         }
     }
 
-    function claimAll() public
+    function claimReferralBonus() public
     {
-        for (uint8 round = 1; round <= buyRoundsCount; round++)
-        {
-            uint256 amount = contribution[msg.sender][round];
-
-            if (amount > 0)
-            {            
-                if (refundsAllowedUntil > block.timestamp) 
-                {
-                    contribution[msg.sender][round] = 0;
-                    baseToken.safeTransfer(msg.sender, amount);
-                }
-                else 
-                {
-                    marketDistribution.claim(msg.sender, amount, round);
-                }
-            }            
-        }        
+        require (referralPoints[msg.sender] > 0, "No bonus to claim");
+        
+        uint256 refShare = referralPoints[msg.sender];
+        referralPoints[msg.sender] = 0;
+        marketDistribution.claimReferralRewards(msg.sender, refShare);
     }
 
-    function claimRefBonus() public
-    {
-        require (refPoints[msg.sender] > 0, "No bonus to claim");
-        uint256 refShare = refPoints[msg.sender];
-        refPoints[msg.sender] = 0;
-        marketDistribution.claimRefRewards(msg.sender, refShare);
-    }
-
-    function contribute(uint256 amount, uint8 round, address ref) public active() 
+    function contribute(uint256 amount, uint8 round, address referral) public active() 
     {
         require (round > 0 && round <= buyRoundsCount, "Round is 1 to 3");
         require (totalRaised <= hardCap, "Hardcap reached");
 
         baseToken.safeTransferFrom(msg.sender, address(this), amount);
-        if (ref == address(0)) 
+        if (referral == address(0)) 
         {
-            refPoints[devAddr] = refPoints[devAddr] + amount;
-            totalRefPoints = totalRefPoints + amount;
+            uint256 oldReferralPoints = referralPoints[devAddress];
+            uint256 newReferralPoints = oldReferralPoints + amount;
+            referralPoints[devAddress] = newReferralPoints;
+            totalReferralPoints = totalReferralPoints + amount;
         }
         else 
         {
-            refPoints[msg.sender] = refPoints[msg.sender] + amount;
-            refPoints[ref] = refPoints[ref] + amount;
-            totalRefPoints = totalRefPoints + amount + amount;
+            uint256 oldReferralPoints = referralPoints[msg.sender];
+            uint256 newReferralPoints = oldReferralPoints + amount;
+            referralPoints[msg.sender] = newReferralPoints;
+
+            oldReferralPoints = referralPoints[referral];
+            newReferralPoints = oldReferralPoints + amount;
+            referralPoints[referral] = newReferralPoints;
+
+            totalReferralPoints = totalReferralPoints + amount + amount;
         }
 
         totalRaised = totalRaised + amount;
 
-        uint256 oldContribution = contribution[msg.sender][round];
+        uint256 oldContribution = totalContribution[msg.sender];
         uint256 newContribution = oldContribution + amount;
-        contribution[msg.sender][round] = newContribution;
+        totalContribution[msg.sender] = newContribution;
 
-        uint256 oldTotal = roundTotals[round];
+        uint256 oldContributionPerRound = contributionPerRound[msg.sender][round];
+        uint256 newContributionPerRound = oldContributionPerRound + amount;
+        contributionPerRound[msg.sender][round] = newContributionPerRound;
+
+        uint256 oldTotal = totalContributionPerRound[round];
         uint256 newTotal = oldTotal + amount;
 
-        roundTotals[round] = newTotal;
+        totalContributionPerRound[round] = newTotal;
     }
 }
