@@ -15,9 +15,9 @@ some ways Rootkit.finance is just Rooted ETH.
 Its time to ROOT EVERYTHING ON EVERY CHAIN!!
 */
 
-import "./GatedERC20.sol";
+import "./LiquidityLockedERC20.sol";
 
-contract RootedToken is GatedERC20("RootKit", "ROOT")
+contract RootedToken is LiquidityLockedERC20("RootKit", "ROOT")
 {
     address public minter;
 

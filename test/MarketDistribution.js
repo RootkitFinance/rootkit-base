@@ -1,7 +1,7 @@
 const { expect } = require("chai");
 const { ethers } = require("hardhat");
-const { createWETH, createUniswap } = require("./helpers");
-const { utils, BigNumber, constants } = require("ethers");
+const { createUniswap } = require("./helpers");
+const { utils, constants } = require("ethers");
 
 describe("MarketDistribution", function() {
     let owner, dev, user1, user2, user3, rootedToken, baseToken, eliteToken, marketGeneration, marketDistribution, uniswap;
@@ -12,7 +12,7 @@ describe("MarketDistribution", function() {
         
         const rootedTokenFactory = await ethers.getContractFactory("RootedToken");
         rootedToken = await rootedTokenFactory.connect(owner).deploy();
-        const baseTokenFactory = await ethers.getContractFactory("Tether");
+        const baseTokenFactory = await ethers.getContractFactory("TetherTest");
         baseToken = await baseTokenFactory.connect(owner).deploy();
         const eliteTokenFactory = await ethers.getContractFactory("EliteToken");
         eliteToken = await eliteTokenFactory.connect(owner).deploy(baseToken.address);

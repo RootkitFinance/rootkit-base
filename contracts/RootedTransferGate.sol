@@ -34,31 +34,17 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    enum AddressState
-    {
-        Unknown,
-        NotPool,
-        DisallowedPool,
-        AllowedPool
-    }
-
     IUniswapV2Router02 immutable internal uniswapV2Router;
     IUniswapV2Factory immutable internal uniswapV2Factory;
     IERC31337 immutable internal rootedToken;
 
-    mapping (address => AddressState) public addressStates;
-    IERC20[] public allowedPoolTokens;
-    
     bool public unrestricted;
     mapping (address => bool) public unrestrictedControllers;
     mapping (address => bool) public feeControllers;
     mapping (address => bool) public freeParticipantControllers;
     mapping (address => bool) public freeParticipant;
 
-    mapping (address => uint256) public liquiditySupply;
-    address public mustUpdate;
-
-    FeeSplitter public feeSplitter;
+    address public override feeSplitter;
     uint16 public feesRate; 
     uint16 public sellFeesRate;
     address public taxedPool;
@@ -73,8 +59,6 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         uniswapV2Router = _uniswapV2Router;
         uniswapV2Factory = IUniswapV2Factory(_uniswapV2Router.factory());
     }
-
-    function allowedPoolTokensCount() public view returns (uint256) { return allowedPoolTokens.length; }
 
     function setUnrestrictedController(address unrestrictedController, bool allow) public ownerOnly()
     {
@@ -91,14 +75,14 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         feeControllers[feeController] = allow;
     }
 
-    function setFeeSplitter(FeeSplitter _feeSplitter) public ownerOnly()
+    function setFeeSplitter(address _feeSplitter) public ownerOnly()
     {
         feeSplitter = _feeSplitter;
     }
 
     function setFreeParticipant(address participant, bool free) public
     {
-        require (msg.sender == owner || freeParticipantControllers[msg.sender], "Not an Owner or Free Participant");
+        require (msg.sender == owner || freeParticipantControllers[msg.sender], "Not an owner or free participant");
         freeParticipant[participant] = free;
     }
 
@@ -150,120 +134,18 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         sellFeesRate = _sellFeesRate;
     }
 
-    function allowPool(IERC20 token) public ownerOnly()
+    function handleTransfer(address, address from, address to, uint256 amount) public virtual override returns (uint256)
     {
-        address pool = uniswapV2Factory.getPair(address(rootedToken), address(token));
-        if (pool == address(0)) {
-            pool = uniswapV2Factory.createPair(address(rootedToken), address(token));
-        }
-        AddressState state = addressStates[pool];
-        require (state != AddressState.AllowedPool, "Already allowed");
-        addressStates[pool] = AddressState.AllowedPool;
-        allowedPoolTokens.push(token);
-        liquiditySupply[pool] = IERC20(pool).totalSupply();
-    }
-
-    function handleTransfer(address, address from, address to, uint256 amount) public virtual override returns (address, uint256)
-    {
+        if (unrestricted || freeParticipant[from] || freeParticipant[to]) 
         {
-            address mustUpdateAddress = mustUpdate;
-            if (mustUpdateAddress != address(0)) {
-                mustUpdate = address(0);
-                uint256 newSupply = IERC20(mustUpdateAddress).totalSupply();
-                uint256 oldSupply = liquiditySupply[mustUpdateAddress];
-                if (newSupply != oldSupply) {
-                    liquiditySupply[mustUpdateAddress] = unrestricted ? newSupply : (newSupply > oldSupply ? newSupply : oldSupply);
-                }
-            }
+            return 0;
         }
-        {
-            AddressState fromState = addressStates[from];
-            AddressState toState = addressStates[to];
-            if (fromState != AddressState.AllowedPool && toState != AddressState.AllowedPool) {
-                if (fromState == AddressState.Unknown) { fromState = detectState(from); }
-                if (toState == AddressState.Unknown) { toState = detectState(to); }
-                require (unrestricted || (fromState != AddressState.DisallowedPool && toState != AddressState.DisallowedPool), "Pool not approved");
-            }
-            if (toState == AddressState.AllowedPool) {
-                mustUpdate = to;
-            }
-            if (fromState == AddressState.AllowedPool) {
-                if (unrestricted) {
-                    liquiditySupply[from] = IERC20(from).totalSupply();
-                }
-                require (IERC20(from).totalSupply() >= liquiditySupply[from], "Cannot remove liquidity");            
-            }
-        }
-        if (unrestricted || freeParticipant[from] || freeParticipant[to]) {
-            return (address(feeSplitter), 0);
-        }
-        if (to == address(taxedPool)) {
-            return (address(feeSplitter), amount * sellFeesRate / 10000 + amount * getDumpTax() / 10000);
-        }
-        // "amount" will never be > totalSupply which is capped at 10k, so these multiplications will never overflow      
-        return (address(feeSplitter), amount * feesRate / 10000);
-    }
 
-    function setAddressState(address a, AddressState state) public ownerOnly()
-    {
-        addressStates[a] = state;
-    }
-
-    function detectState(address a) public returns (AddressState state) 
-    {
-        state = AddressState.NotPool;
-        if (a.isContract()) {
-            try this.throwAddressState(a)
-            {
-                assert(false);
-            }
-            catch Error(string memory result) {
-                // if (bytes(result).length == 1) {
-                //     state = AddressState.NotPool;
-                // }
-                if (bytes(result).length == 2) {
-                    state = AddressState.DisallowedPool;
-                }
-            }
-            catch {
-            }
-        }
-        addressStates[a] = state;
-        return state;
-    }
-    
-    // Not intended for external consumption
-    // Always throws
-    // We want to call functions to probe for things, but don't want to open ourselves up to
-    // possible state-changes
-    // So we return a value by reverting with a message
-    function throwAddressState(address a) external view
-    {
-        try IUniswapV2Pair(a).factory() returns (address factory)
+        if (to == address(taxedPool)) 
         {
-            if (factory == address(uniswapV2Factory)) {
-                // these checks for token0/token1 are just for additional
-                // certainty that we're interacting with a uniswap pair
-                try IUniswapV2Pair(a).token0() returns (address token0)
-                {
-                    if (token0 == address(rootedToken)) {
-                        revert("22");
-                    }
-                    try IUniswapV2Pair(a).token1() returns (address token1)
-                    {
-                        if (token1 == address(rootedToken)) {
-                            revert("22");
-                        }                        
-                    }
-                    catch { 
-                    }                    
-                }
-                catch { 
-                }
-            }
+            return amount * sellFeesRate / 10000 + amount * getDumpTax() / 10000;
         }
-        catch {             
-        }
-        revert("1");
-    }
+
+        return amount * feesRate / 10000;
+    }   
 }

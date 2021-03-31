@@ -3,7 +3,7 @@ pragma solidity ^0.7.4;
 
 import "../ERC20.sol";
 
-contract Tether is ERC20("Tether", "USDT") 
+contract TetherTest is ERC20("Tether", "USDT") 
 { 
     constructor()
     {
