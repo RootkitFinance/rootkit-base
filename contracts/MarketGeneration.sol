@@ -31,12 +31,12 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     uint256 hardCap;
     uint8 constant public override buyRoundsCount = 3;
 
-    constructor (RootedToken _rootedToken, IERC20 _baseToken, uint256 _hardCap, address _devAddr)
+    constructor (RootedToken _rootedToken, IERC20 _baseToken, uint256 _hardCap, address _devAddress)
     {
         rootedToken = _rootedToken;
         baseToken = _baseToken;
         hardCap = _hardCap;
-        devAddress = _devAddr;
+        devAddress = _devAddress;
     }
 
     modifier active()

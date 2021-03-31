@@ -85,8 +85,8 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     uint16 constant public preBuyForReferralsPercent = 200; // 2%
     uint16 constant public preBuyForMarketManipulationPercent = 900; // 9%
     uint256 public override vestingPeriodStartTime;
-    uint256 public override vestingEnd; // 7 days
-    uint256 public vestingDuration = 600000 seconds;
+    uint256 public override vestingPeriodEndTime; 
+    uint256 public vestingDuration = 600000 seconds; // ~6.9 days
     uint256 rootedBottom;
 
     constructor(RootedToken _rootedToken, IUniswapV2Router02 _uniswapV2Router, IERC31337 _eliteToken, address _devAddress)
@@ -142,7 +142,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         require (totalContributions > 0, "Nothing to distribute");
 
         vestingPeriodStartTime = block.timestamp;
-        vestingEnd = block.timestamp + vestingDuration;
+        vestingPeriodEndTime = block.timestamp + vestingDuration;
         distributionComplete = true;
         totalBaseTokenCollected = totalContributions;
         baseToken.safeTransferFrom(msg.sender, address(this), totalBaseTokenCollected);
@@ -285,7 +285,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         }
 
         uint256 share = totalOwed[account];  
-        uint256 endTime = vestingEnd > block.timestamp ? block.timestamp : vestingEnd;
+        uint256 endTime = vestingPeriodEndTime > block.timestamp ? block.timestamp : vestingPeriodEndTime;
 
         require (claimTime[account] <= endTime, "Already claimed");
 

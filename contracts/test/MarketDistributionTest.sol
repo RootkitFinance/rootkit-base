@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: J-J-J-JENGA!!!
+// SPDX-License-Identifier: P-P-P-PONZO!!!
 pragma solidity ^0.7.4;
 
 
@@ -17,7 +17,9 @@ contract MarketDistributionTest is IMarketDistribution
 
     mapping (address => uint256) public claimCallAmount;
     mapping (address => uint256) public claimReferralBonusCallAmount;
-    bool public override distributionComplete;
+    bool public override distributionComplete;   
+    uint256 public override vestingPeriodStartTime;
+    uint256 public override vestingPeriodEndTime; 
     IMarketGeneration public marketGeneration; 
 
     constructor(RootedToken _rootedToken, IERC20 _baseToken)
@@ -44,15 +46,5 @@ contract MarketDistributionTest is IMarketDistribution
     {
         require (distributionComplete, "Not complete");
         claimReferralBonusCallAmount[account] = referralShare;
-    }
-
-    function generationEndTime() public override view returns (uint256) 
-    { 
-        return block.timestamp; 
-    }
-
-    function vestingEnd() public override view returns (uint256) 
-    { 
-        return block.timestamp; 
     }
 }
