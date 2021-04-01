@@ -5,8 +5,9 @@ import "./ERC20.sol";
 import "./Owned.sol";
 import "./IUniswapV2Pair.sol";
 import "./GatedERC20.sol";
+import "./ILiquidityLockedERC20.sol";
 
-abstract contract LiquidityLockedERC20 is GatedERC20
+abstract contract LiquidityLockedERC20 is GatedERC20, ILiquidityLockedERC20
 {
     mapping (IUniswapV2Pair => bool) public liquidityPairLocked;
     mapping (address => bool) public liquidityController;
@@ -25,7 +26,7 @@ abstract contract LiquidityLockedERC20 is GatedERC20
     {
     }
 
-    function setLiquidityLock(IUniswapV2Pair _liquidityPair, bool _locked) public
+    function setLiquidityLock(IUniswapV2Pair _liquidityPair, bool _locked) public override
     {
         require (liquidityController[msg.sender], "Liquidity controller only");
         require (_liquidityPair.token0() == address(this) || _liquidityPair.token1() == address(this), "Unrelated pair");

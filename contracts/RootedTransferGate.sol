@@ -16,11 +16,11 @@ It:
 */
 
 import "./Owned.sol";
+import "./Address.sol";
 import "./IUniswapV2Factory.sol";
 import "./IERC20.sol";
 import "./IUniswapV2Pair.sol";
-import "./EliteToken.sol";
-import "./Address.sol";
+import "./ILiquidityLockedERC20.sol";
 import "./IUniswapV2Router02.sol";
 import "./SafeERC20.sol";
 import "./SafeMath.sol";
@@ -36,7 +36,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
 
     IUniswapV2Router02 immutable internal uniswapV2Router;
     IUniswapV2Factory immutable internal uniswapV2Factory;
-    IERC31337 immutable internal rootedToken;
+    ILiquidityLockedERC20 immutable internal rootedToken;
 
     bool public unrestricted;
     mapping (address => bool) public unrestrictedControllers;
@@ -47,13 +47,13 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     address public override feeSplitter;
     uint16 public feesRate; 
     uint16 public sellFeesRate;
-    address public taxedPool;
+    IUniswapV2Pair public taxedPool;
    
     uint16 public dumpTaxStartRate; 
     uint256 public dumpTaxDurationInSeconds;
     uint256 public dumpTaxEndTimestamp;
 
-    constructor(IERC31337 _rootedToken, IUniswapV2Router02 _uniswapV2Router)
+    constructor(ILiquidityLockedERC20 _rootedToken, IUniswapV2Router02 _uniswapV2Router)
     {
         rootedToken = _rootedToken;
         uniswapV2Router = _uniswapV2Router;
@@ -90,11 +90,11 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     {
         require (unrestrictedControllers[msg.sender], "Not an unrestricted controller");
         unrestricted = _unrestricted;
+        rootedToken.setLiquidityLock(taxedPool, !_unrestricted);
     }    
 
-    function setTaxedPool(address _taxedPool) public ownerOnly()
+    function setTaxedPool(IUniswapV2Pair _taxedPool) public ownerOnly()
     {
-        require (taxedPool == address(0), "Taxed pool aready set");
         taxedPool = _taxedPool;
     }
 

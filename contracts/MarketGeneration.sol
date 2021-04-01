@@ -18,6 +18,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     mapping (address => uint256) public override totalContribution; // address > amount 
     mapping (uint8 => uint256) public override totalContributionPerRound; // total contributed to each buy round
     mapping (address => uint256) public override referralPoints; // address > amount
+    mapping (uint8 => bool) public disabledRounds;
     uint256 public override totalReferralPoints;
     address public devAddress;
 
@@ -28,14 +29,12 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     IMarketDistribution public marketDistribution;
     uint256 refundsAllowedUntil;
     uint256 totalRaised;
-    uint256 hardCap;
     uint8 constant public override buyRoundsCount = 3;
 
-    constructor (RootedToken _rootedToken, IERC20 _baseToken, uint256 _hardCap, address _devAddress)
+    constructor (RootedToken _rootedToken, IERC20 _baseToken, address _devAddress)
     {
         rootedToken = _rootedToken;
         baseToken = _baseToken;
-        hardCap = _hardCap;
         devAddress = _devAddress;
     }
 
@@ -55,12 +54,18 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
 
     function setMarketDistribution(IMarketDistribution _marketDistribution) public ownerOnly() active()
     {
-        require (address(_marketDistribution) != address(0));
+        require (address(_marketDistribution) != address(0), "Invalid market distribution");
         if (_marketDistribution == marketDistribution) { return; }
         marketDistribution = _marketDistribution;
 
         // Give everyone 1 day to claim refunds if they don't approve of the new distributor
         refundsAllowedUntil = block.timestamp + 86400;
+    }
+
+     function disableByuRound(uint8 round, bool disabled) public ownerOnly() active()
+    {
+        require (round > 0 && round <= buyRoundsCount, "Round must be 1 to 3");
+        disabledRounds[round] = disabled;
     }
 
     function complete() public ownerOnly() active()
@@ -112,8 +117,8 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
 
     function contribute(uint256 amount, uint8 round, address referral) public active() 
     {
-        require (round > 0 && round <= buyRoundsCount, "Round is 1 to 3");
-        require (totalRaised <= hardCap, "Hardcap reached");
+        require (round > 0 && round <= buyRoundsCount, "Round must be 1 to 3");
+        require (!disabledRounds[round], "Round is disabled");
 
         baseToken.safeTransferFrom(msg.sender, address(this), amount);
         if (referral == address(0)) 

@@ -89,13 +89,14 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     uint256 public vestingDuration = 600000 seconds; // ~6.9 days
     uint256 rootedBottom;
 
-    constructor(RootedToken _rootedToken, IUniswapV2Router02 _uniswapV2Router, IERC31337 _eliteToken, address _devAddress)
+    constructor(RootedToken _rootedToken, IERC31337 _eliteToken, IMarketGeneration _marketGeneration, IUniswapV2Router02 _uniswapV2Router,address _devAddress)
     {
         require (address(_rootedToken) != address(0));
 
-        rootedToken = _rootedToken;
-        uniswapV2Router = _uniswapV2Router;
+        rootedToken = _rootedToken;        
         eliteToken = _eliteToken;
+        uniswapV2Router = _uniswapV2Router;
+        marketGeneration = _marketGeneration;
 
         uniswapV2Factory = IUniswapV2Factory(_uniswapV2Router.factory());
         baseToken = _eliteToken.wrappedToken();
@@ -126,17 +127,16 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     {       
         eliteToken.approve(address(uniswapV2Router), uint256(-1));
         rootedToken.approve(address(uniswapV2Router), uint256(-1));
-        baseToken.approve(address(uniswapV2Router), uint256(-1));
-        baseToken.approve(address(eliteToken), uint256(-1));
+        baseToken.safeApprove(address(uniswapV2Router), uint256(-1));
+        baseToken.safeApprove(address(eliteToken), uint256(-1));
         rootedBaseLP.approve(address(uniswapV2Router), uint256(-1));
         rootedEliteLP.approve(address(uniswapV2Router), uint256(-1));
     }
 
     function distribute() public override
     {
+        require (msg.sender == address(marketGeneration), "Unauthorized");
         require (!distributionComplete, "Distribution complete");
-
-        marketGeneration = IMarketGeneration(msg.sender);
         uint256 totalContributions = baseToken.balanceOf(address(marketGeneration));
 
         require (totalContributions > 0, "Nothing to distribute");
@@ -145,12 +145,12 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         vestingPeriodEndTime = block.timestamp + vestingDuration;
         distributionComplete = true;
         totalBaseTokenCollected = totalContributions;
-        baseToken.safeTransferFrom(msg.sender, address(this), totalBaseTokenCollected);
-        
-        rootedToken.mint(totalBaseTokenCollected);
+        baseToken.safeTransferFrom(msg.sender, address(this), totalBaseTokenCollected);  
 
         RootedTransferGate gate = RootedTransferGate(address(rootedToken.transferGate()));
+
         gate.setUnrestricted(true);
+        rootedToken.mint(totalBaseTokenCollected);
 
         createRootedEliteLiquidity();
 
@@ -158,7 +158,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         eliteToken.depositTokens(baseToken.balanceOf(address(this)));  
 
         uint256 devCut = totalBaseTokenCollected * devCutPercent / 10000;        
-        buyTheBottom(devCut);     
+        buyTheBottom(devCut); // dev cut is used for Tether stabilization fund. Original dev cut amount will be taken in the future
 
         preBuyForMarketManipulation();
         preBuyForReferrals();
@@ -166,7 +166,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
 
         eliteToken.transfer(devAddress, eliteToken.balanceOf(address(this))); // pump fund, send direct to bobber in future
 
-        sellTheTop();
+        sellTheTop(); 
         createRootedBaseLiquidity();
 
         gate.setUnrestricted(false);
@@ -174,12 +174,14 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     
     function buyTheBottom(uint256 devCut) private
     {
+        // dev cut is used for Tether stabilization fund. Original dev cut amount will be taken in the future
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(devCut, 0, eliteRootedPath(), address(this), block.timestamp);
         rootedBottom = amounts[1];
     }
 
     function sellTheTop() private
     {
+        // dev cut is used for Tether stabilization fund. Original dev cut amount will be taken in the future
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(rootedBottom, 0, rootedElitePath(), address(this), block.timestamp);
         uint256 eliteAmount = amounts[1];
         eliteToken.withdrawTokens(eliteAmount);
@@ -217,8 +219,10 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
             uint256 roundBuy = totalRound * buyPercent / 10000;
 
             if (roundBuy > 0)
-            {                
-                uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(roundBuy, 0, eliteRootedPath(), address(this), block.timestamp);
+            {   
+                uint256 eliteBalance = eliteToken.balanceOf(address(this));   
+                uint256 amount = roundBuy > eliteBalance ? eliteBalance : roundBuy;      
+                uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
                 totalRootedTokenBoughtPerRound[round] = amounts[1];
             }            
         }

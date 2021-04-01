@@ -13,8 +13,7 @@ contract EliteToken is ERC31337, IEliteToken
     mapping (address => bool) public freeParticipantControllers;
     mapping (address => bool) public freeParticipants; // Free Participants are exempt from burn fee
 
-    mapping (address => bool) public burnRateManagerControllers;
-    mapping (address => bool) public burnRateManagers; // Burn Rate Managers set burn rate
+    mapping (address => bool) public burnRateControllers;
     uint16 burnRate;   
 
     constructor (IERC20 _wrappedToken) ERC31337(_wrappedToken, "RootKit [Wrapped ETH]", "RK:ETH")
@@ -28,24 +27,18 @@ contract EliteToken is ERC31337, IEliteToken
 
     function setFreeParticipant(address participant, bool free) public
     {
-        require (msg.sender == owner || freeParticipantControllers[msg.sender], "Not an Owner or Free Participant Controller");
+        require (msg.sender == owner || freeParticipantControllers[msg.sender], "Not an owner or free participant controller");
         freeParticipants[participant] = free;
     }
 
-    function setBurnRateManagerController(address burnRateManagerController, bool allow) public ownerOnly()
+    function setBurnRateController(address burnRateController, bool allow) public ownerOnly()
     {
-        burnRateManagerControllers[burnRateManagerController] = allow;
+        burnRateControllers[burnRateController] = allow;
     }
 
-    function setBurnRateManager(address burnRateManager, bool free) public
+    function setBurnRate(uint16 _burnRate) public // 10000 = 100%
     {
-        require (msg.sender == owner || burnRateManagerControllers[msg.sender], "Not an Owner or Burn Rate Manager Controller");
-        burnRateManagers[burnRateManager] = free;
-    }
-
-    function setBurnRate(uint16 _burnRate) public ownerOnly() // 10000 = 100%
-    {
-        require (msg.sender == owner || burnRateManagers[msg.sender], "Not an Owner or Burn Rate Manager");
+        require (msg.sender == owner || burnRateControllers[msg.sender], "Not an owner or burn rate controller");
         require (_burnRate <= 10000, "But rate must be less or equal to 100%");
        
         burnRate = _burnRate;
