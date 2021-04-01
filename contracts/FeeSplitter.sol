@@ -35,13 +35,13 @@ contract FeeSplitter is TokensRecoverable
 
     function setDevAddressController(address controllers, bool allow) public
     {
-        require (devAddressControllers[msg.sender], "Not a Dev Address Controllers");
+        require (devAddressControllers[msg.sender], "Not a dev address controllers");
         devAddressControllers[controllers] = allow;
     }
 
     function setDevAddress(address _devAddress) public
     {
-        require (devAddressControllers[msg.sender], "Not a Dev Address Controller");
+        require (devAddressControllers[msg.sender], "Not a dev address controller");
         devAddress = _devAddress;
     }
 
@@ -53,7 +53,7 @@ contract FeeSplitter is TokensRecoverable
     function setFees(IGatedERC20 token, uint256 burnRate, address[] memory collectors, uint256[] memory rates) public ownerOnly() // 100% = 10000
     {
         require (collectors.length == rates.length && collectors.length > 1, "Fee Collectors and Rates must be the same size and contain at least 2 elements");
-        require (collectors[0] == devAddress && collectors[1] == rootFeederAddress, "First address must be dev address, second address must be rootFeederAddress");
+        require (collectors[0] == devAddress && collectors[1] == rootFeederAddress, "First address must be dev address, second address must be rootFeeder address");
         require (rates[0] >= devRateMin && rates[1] >= rootRateMin, "First rate must be greater or equal to devRateMin and second rate must be greater or equal to rootRateMin");
         
         uint256 totalRate = burnRate;
