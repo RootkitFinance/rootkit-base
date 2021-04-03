@@ -62,7 +62,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         refundsAllowedUntil = block.timestamp + 86400;
     }
 
-     function disableByuRound(uint8 round, bool disabled) public ownerOnly() active()
+     function disableBuyRound(uint8 round, bool disabled) public ownerOnly() active()
     {
         require (round > 0 && round <= buyRoundsCount, "Round must be 1 to 3");
         disabledRounds[round] = disabled;
