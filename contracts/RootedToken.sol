@@ -30,6 +30,6 @@ contract RootedToken is LiquidityLockedERC20("RootKit", "ROOT")
     {
         require(msg.sender == minter, "Not a minter");
         require(this.totalSupply() == 0, "Already minted");
-        _mint(msg.sender, amount);
+        _mint(msg.sender, amount * 1e12); // tether!!!
     }
 }

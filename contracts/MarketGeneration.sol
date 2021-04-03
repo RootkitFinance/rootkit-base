@@ -121,7 +121,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         require (!disabledRounds[round], "Round is disabled");
 
         baseToken.safeTransferFrom(msg.sender, address(this), amount);
-        if (referral == address(0)) 
+        if (referral == address(0) || referral == msg.sender) 
         {
             uint256 oldReferralPoints = referralPoints[devAddress];
             uint256 newReferralPoints = oldReferralPoints + amount;

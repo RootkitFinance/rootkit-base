@@ -89,7 +89,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     uint256 public vestingDuration = 600000 seconds; // ~6.9 days
     uint256 rootedBottom;
 
-    constructor(RootedToken _rootedToken, IERC31337 _eliteToken, IMarketGeneration _marketGeneration, IUniswapV2Router02 _uniswapV2Router,address _devAddress)
+    constructor(RootedToken _rootedToken, IERC31337 _eliteToken, IMarketGeneration _marketGeneration, IUniswapV2Router02 _uniswapV2Router, address _devAddress)
     {
         require (address(_rootedToken) != address(0));
 
@@ -197,7 +197,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
 
     function preBuyForMarketManipulation() private 
     {
-        uint256 amount = totalBaseTokenCollected * preBuyForMarketManipulationPercent / 10000;        
+        uint256 amount = totalBaseTokenCollected * preBuyForMarketManipulationPercent / 10000;  
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
         uint256 rootedAmout = amounts[1];
         rootedToken.transfer(devAddress, rootedAmout); // send to Bobber
@@ -232,13 +232,13 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     {
         uint256 elitePerLpToken = eliteToken.balanceOf(address(rootedEliteLP)).mul(1e18).div(rootedEliteLP.totalSupply());
         uint256 lpAmountToRemove = baseToken.balanceOf(address(eliteToken)).mul(1e18).div(elitePerLpToken);
-       
+        
         (uint256 eliteAmount, uint256 rootedAmount) = uniswapV2Router.removeLiquidity(address(eliteToken), address(rootedToken), lpAmountToRemove, 0, 0, address(this), block.timestamp);
         
         uint256 baseInElite = baseToken.balanceOf(address(eliteToken));
-        uint256 baseAmount = eliteAmount > baseInElite ? baseInElite : eliteAmount;
+        uint256 baseAmount = eliteAmount > baseInElite ? baseInElite : eliteAmount;       
         
-        eliteToken.withdrawTokens(baseInElite);
+        eliteToken.withdrawTokens(baseAmount);
         uniswapV2Router.addLiquidity(address(baseToken), address(rootedToken), baseAmount, rootedAmount, 0, 0, address(this), block.timestamp);
         rootedBaseLP.transfer(devAddress, rootedBaseLP.balanceOf(address(this)));
         rootedEliteLP.transfer(devAddress, rootedEliteLP.balanceOf(address(this)));
