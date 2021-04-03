@@ -75,7 +75,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         if (baseToken.balanceOf(address(this)) == 0) { return; }
 
         rootedToken.approve(address(marketDistribution), uint256(-1));
-        baseToken.approve(address(marketDistribution), uint256(-1));
+        baseToken.safeApprove(address(marketDistribution), uint256(-1));
 
         marketDistribution.distribute();
     }
