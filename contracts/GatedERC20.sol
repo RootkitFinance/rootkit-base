@@ -18,7 +18,6 @@ abstract contract GatedERC20 is ERC20, TokensRecoverable, IGatedERC20
 {
     using SafeMath for uint256;
 
-
     ITransferGate public override transferGate;
 
     constructor(string memory _name, string memory _symbol) ERC20(_name, _symbol)
@@ -41,10 +40,14 @@ abstract contract GatedERC20 is ERC20, TokensRecoverable, IGatedERC20
         uint256 remaining = amount;
         if (address(_transferGate) != address(0)) 
         {
-           address splitter = _transferGate.feeSplitter();
-           uint256 fees = _transferGate.handleTransfer(msg.sender, sender, recipient, amount);
-           _balanceOf[splitter] = _balanceOf[splitter].add(fees);
-           remaining = remaining.sub(fees);
+            address splitter = _transferGate.feeSplitter();
+            uint256 fees = _transferGate.handleTransfer(msg.sender, sender, recipient, amount);
+            if (fees > 0)
+            {
+               _balanceOf[splitter] = _balanceOf[splitter].add(fees);
+                emit Transfer(sender, splitter, fees);
+                remaining = remaining.sub(fees);
+            }           
         }
         _balanceOf[sender] = _balanceOf[sender].sub(amount, "ERC20: transfer amount exceeds balance");
         _balanceOf[recipient] = _balanceOf[recipient].add(remaining);
