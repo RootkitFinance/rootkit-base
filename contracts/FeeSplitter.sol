@@ -18,30 +18,23 @@ contract FeeSplitter is TokensRecoverable
     uint256 devRateMin = 1000;  // 10% of overall fees
     uint256 rootRateMin = 1000; // 10% of overall fees
     address public devAddress;
+    address public immutable deployerAddress;
     address public rootFeederAddress;
 
     mapping (IGatedERC20 => address[]) public feeCollectors;
     mapping (IGatedERC20 => uint256[]) public feeRates;
     mapping (IGatedERC20 => uint256) public burnRates;
 
-    mapping (address => bool) public devAddressControllers;
-
     constructor(address _devAddress, address _rootFeederAddress)
     {
-        devAddressControllers[msg.sender] = true;
+        deployerAddress = msg.sender;
         devAddress = _devAddress;
         rootFeederAddress = _rootFeederAddress;
     }
 
-    function setDevAddressController(address controllers, bool allow) public
-    {
-        require (devAddressControllers[msg.sender], "Not a dev address controllers");
-        devAddressControllers[controllers] = allow;
-    }
-
     function setDevAddress(address _devAddress) public
     {
-        require (devAddressControllers[msg.sender], "Not a dev address controller");
+        require (msg.sender == deployerAddress || msg.sender == devAddress, "Not a deployer or dev address");
         devAddress = _devAddress;
     }
 

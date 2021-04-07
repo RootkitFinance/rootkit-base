@@ -7,7 +7,6 @@ Ensures 100% of accessible funds are backed at all times
 */
 
 import "./IFloorCalculator.sol";
-import "./RootedToken.sol";
 import "./SafeMath.sol";
 import "./UniswapV2Library.sol";
 import "./IUniswapV2Factory.sol";
@@ -59,19 +58,21 @@ contract EliteFloorCalculator is IFloorCalculator, TokensRecoverable
     function ignoredAddressesTotalBalance() public view returns (uint256)
     {
         uint256 total = 0;
-        for (uint i = 0; i < ignoredAddresses.length(); i++) {
+        for (uint i = 0; i < ignoredAddresses.length(); i++) 
+        {
             total = total.add(rootedToken.balanceOf(ignoredAddresses.at(i)));
         }
 
         return total;
     }
 
-    function calculateExcessInPool(IERC20 token, address pair, uint256 liquidityShare, uint256 rootedTokenotalSupply, uint256 rootedTokenPoolsLiquidity) internal view returns (uint256)
+    function calculateExcessInPool(IERC20 token, address pair, uint256 liquidityShare, uint256 rootedTokenTotalSupply, uint256 rootedTokenPoolsLiquidity) internal view returns (uint256)
     {
-        uint256 freeRootedToken = (rootedTokenotalSupply.sub(rootedTokenPoolsLiquidity)).mul(liquidityShare).div(1e12);
+        uint256 freeRootedToken = (rootedTokenTotalSupply.sub(rootedTokenPoolsLiquidity)).mul(liquidityShare).div(1e12);
 
         uint256 sellAllProceeds = 0;
-        if (freeRootedToken > 0) {
+        if (freeRootedToken > 0) 
+        {
             address[] memory path = new address[](2);
             path[0] = address(rootedToken);
             path[1] = address(token);
@@ -86,31 +87,31 @@ contract EliteFloorCalculator is IFloorCalculator, TokensRecoverable
         return excessInPool;
     }
 
-    function calculateExcessInPools(IERC20 wrappedToken, IERC20 backingToken) public view returns (uint256)
+    function calculateExcessInPools(IERC20 baseToken, IERC20 eliteToken) public view returns (uint256)
     {
-        address kethPair = UniswapV2Library.pairFor(address(uniswapV2Factory), address(rootedToken), address(backingToken));
-        address wethPair = UniswapV2Library.pairFor(address(uniswapV2Factory), address(rootedToken), address(wrappedToken));   
+        address rootedElitePair = UniswapV2Library.pairFor(address(uniswapV2Factory), address(rootedToken), address(eliteToken));
+        address rootedBasePair = UniswapV2Library.pairFor(address(uniswapV2Factory), address(rootedToken), address(baseToken));   
         
-        uint256 rootedTokenotalSupply = rootedToken.totalSupply().sub(ignoredAddressesTotalBalance());
-        uint256 rootedTokenPoolsLiquidity = rootedToken.balanceOf(kethPair).add(rootedToken.balanceOf(wethPair));
-        uint256 ethPoolsLiquidity = backingToken.balanceOf(kethPair).add(wrappedToken.balanceOf(wethPair));
+        uint256 rootedTokenTotalSupply = rootedToken.totalSupply().sub(ignoredAddressesTotalBalance());
+        uint256 rootedTokenPoolsLiquidity = rootedToken.balanceOf(rootedElitePair).add(rootedToken.balanceOf(rootedBasePair));
+        uint256 baseTokenPoolsLiquidity = eliteToken.balanceOf(rootedElitePair).add(baseToken.balanceOf(rootedBasePair));
 
-        uint256 rootLiquidityShareInKethPair = rootedToken.balanceOf(kethPair).mul(1e12).div(rootedTokenPoolsLiquidity);
-        uint256 kethLiquidityShareInKethPair = backingToken.balanceOf(kethPair).mul(1e12).div(ethPoolsLiquidity);
-        uint256 avgLiquidityShareInKethPair = (rootLiquidityShareInKethPair.add(kethLiquidityShareInKethPair)).div(2);
+        uint256 rootedLiquidityShareInElitePair = rootedToken.balanceOf(rootedElitePair).mul(1e12).div(rootedTokenPoolsLiquidity);
+        uint256 eliteLiquidityShareInElitePair = eliteToken.balanceOf(rootedElitePair).mul(1e12).div(baseTokenPoolsLiquidity);
+        uint256 avgLiquidityShareInElitePair = (rootedLiquidityShareInElitePair.add(eliteLiquidityShareInElitePair)).div(2);
         uint256 one = 1e12;
 
-        uint256 excessInKethPool = calculateExcessInPool(backingToken, kethPair, avgLiquidityShareInKethPair, rootedTokenotalSupply, rootedTokenPoolsLiquidity);
-        uint256 excessInWethPool = calculateExcessInPool(wrappedToken, wethPair, (one).sub(avgLiquidityShareInKethPair), rootedTokenotalSupply, rootedTokenPoolsLiquidity);
-        return excessInKethPool.add(excessInWethPool);
+        uint256 excessInElitePool = calculateExcessInPool(eliteToken, rootedElitePair, avgLiquidityShareInElitePair, rootedTokenTotalSupply, rootedTokenPoolsLiquidity);
+        uint256 excessInBasePool = calculateExcessInPool(baseToken, rootedBasePair, (one).sub(avgLiquidityShareInElitePair), rootedTokenTotalSupply, rootedTokenPoolsLiquidity);
+        return excessInElitePool.add(excessInBasePool);
     }
 
-    function calculateSubFloor(IERC20 wrappedToken, IERC20 backingToken) public override view returns (uint256) // backing token = keth
+    function calculateSubFloor(IERC20 baseToken, IERC20 eliteToken) public override view returns (uint256)
     {        
-        uint256 excessInPools = calculateExcessInPools(wrappedToken, backingToken);
+        uint256 excessInPools = calculateExcessInPools(baseToken, eliteToken);
 
-        uint256 requiredBacking = backingToken.totalSupply().sub(excessInPools);
-        uint256 currentBacking = wrappedToken.balanceOf(address(backingToken));
+        uint256 requiredBacking = eliteToken.totalSupply().sub(excessInPools);
+        uint256 currentBacking = baseToken.balanceOf(address(eliteToken));
         if (requiredBacking >= currentBacking) { return 0; }
         return currentBacking - requiredBacking;
     }

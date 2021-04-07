@@ -9,7 +9,6 @@ gate allowing for token tax and burn on transfer
 
 import "./ERC20.sol";
 import "./ITransferGate.sol";
-import "./Owned.sol";
 import "./SafeMath.sol";
 import "./TokensRecoverable.sol";
 import "./IGatedERC20.sol";

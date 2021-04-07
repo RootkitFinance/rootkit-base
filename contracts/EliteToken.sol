@@ -67,6 +67,6 @@ contract EliteToken is ERC31337, IEliteToken
 
     function canRecoverTokens(IERC20 token) internal override view returns (bool) 
     { 
-        return address(token) != address(this) &&  address(token) != address(this.wrappedToken()); 
+        return address(token) != address(this) && address(token) != address(this.wrappedToken()); 
     }
 }
