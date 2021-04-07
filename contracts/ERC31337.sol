@@ -10,7 +10,6 @@ Sweepable by designated sweeper addresses
 
 import "./IERC20.sol";
 import "./SafeERC20.sol";
-import "./Owned.sol";
 import "./IFloorCalculator.sol";
 import "./WrappedERC20.sol";
 import "./IERC31337.sol";

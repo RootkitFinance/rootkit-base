@@ -64,4 +64,9 @@ contract EliteToken is ERC31337, IEliteToken
         
         emit Transfer(sender, recipient, remaining);
     }
+
+    function canRecoverTokens(IERC20 token) internal override view returns (bool) 
+    { 
+        return address(token) != address(this) &&  address(token) != address(this.wrappedToken()); 
+    }
 }
