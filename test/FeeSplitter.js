@@ -20,6 +20,29 @@ describe("FeeSplitter", function() {
         await rooted.connect(owner).mint(utils.parseEther("1000"));
     })
 
+    it("reverts setDevAddress when called by non deployer or dev", async function() {        
+        await expect(feeSplitter.connect(rootFeeder).setDevAddress(rootFeeder.address)).to.be.revertedWith("Not a deployer or dev address");
+    })
+
+    it("sets dev address as expected", async function() {   
+        feeSplitter.connect(owner).setDevAddress(feeCollector.address);
+        expect(await feeSplitter.devAddress()).to.equal(feeCollector.address);
+    })
+
+    it("reverts setRootFeederAddress when called by non owner", async function() {        
+        await expect(feeSplitter.connect(dev).setRootFeederAddress(feeCollector.address)).to.be.revertedWith("Owner only");
+    })
+
+    it("sets Root feeder address as expected", async function() {   
+        feeSplitter.connect(owner).setRootFeederAddress(feeCollector.address);
+        expect(await feeSplitter.rootFeederAddress()).to.equal(feeCollector.address);
+    })
+
+    it("sets dev address as expected", async function() {   
+        feeSplitter.connect(owner).setDevAddress(feeCollector.address);
+        expect(await feeSplitter.devAddress()).to.equal(feeCollector.address);
+    })
+
     it("sets fees as expected", async function() {        
         await feeSplitter.setFees(
             rooted.address, 

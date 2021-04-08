@@ -4,7 +4,6 @@ const { constants, utils, BigNumber } = require("ethers");
 
 describe("MarketGeneration", function () {
     let owner, dev, user1, user2, user3, rootedToken, baseToken, marketGeneration, marketDistribution, marketDistributionFactory;
-    const hardCap = utils.parseEther("100");
 
     beforeEach(async function () {
         [owner, dev, user1, user2, user3] = await ethers.getSigners();
@@ -14,7 +13,7 @@ describe("MarketGeneration", function () {
         const baseTokenFactory = await ethers.getContractFactory("ERC20Test");
         baseToken = await baseTokenFactory.connect(owner).deploy();
         const marketGenerationFactory = await ethers.getContractFactory("MarketGeneration");
-        marketGeneration = await marketGenerationFactory.connect(owner).deploy(rootedToken.address, baseToken.address, hardCap, dev.address);
+        marketGeneration = await marketGenerationFactory.connect(owner).deploy(baseToken.address, dev.address);
         marketDistributionFactory = await ethers.getContractFactory("MarketDistributionTest");
         marketDistribution = await marketDistributionFactory.connect(owner).deploy(rootedToken.address, baseToken.address);
     })
@@ -157,16 +156,16 @@ describe("MarketGeneration", function () {
                     expect(await marketDistribution.claimCallAmount(user3.address)).to.equal(utils.parseEther("3"));
                 })
 
-                it("claimReferralBonus() works", async function () {
-                    await marketGeneration.connect(user1).claimReferralBonus();
-                    await marketGeneration.connect(user2).claimReferralBonus();
-                    await marketGeneration.connect(user3).claimReferralBonus();
+                it("claimReferralRewards() works", async function () {
+                    await marketGeneration.connect(user1).claimReferralRewards();
+                    await marketGeneration.connect(user2).claimReferralRewards();
+                    await marketGeneration.connect(user3).claimReferralRewards();
 
-                    expect(await marketDistribution.claimReferralBonusCallAmount(user1.address)).to.equal(utils.parseEther("6"));
-                    expect(await marketDistribution.claimReferralBonusCallAmount(user2.address)).to.equal(utils.parseEther("2"));
-                    expect(await marketDistribution.claimReferralBonusCallAmount(user3.address)).to.equal(utils.parseEther("3"));
+                    expect(await marketDistribution.claimReferralRewardCallAmount(user1.address)).to.equal(utils.parseEther("6"));
+                    expect(await marketDistribution.claimReferralRewardCallAmount(user2.address)).to.equal(utils.parseEther("2"));
+                    expect(await marketDistribution.claimReferralRewardCallAmount(user3.address)).to.equal(utils.parseEther("3"));
 
-                    await expect(marketGeneration.connect(user1).claimReferralBonus()).to.be.revertedWith("No bonus to claim");
+                    await expect(marketGeneration.connect(user1).claimReferralRewards()).to.be.revertedWith("No rewards to claim");
                 })
             })
         })

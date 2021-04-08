@@ -16,7 +16,7 @@ contract MarketDistributionTest is IMarketDistribution
     IERC20 immutable baseToken;
 
     mapping (address => uint256) public claimCallAmount;
-    mapping (address => uint256) public claimReferralBonusCallAmount;
+    mapping (address => uint256) public claimReferralRewardCallAmount;
     bool public override distributionComplete;   
     uint256 public override vestingPeriodStartTime;
     uint256 public override vestingPeriodEndTime; 
@@ -45,6 +45,6 @@ contract MarketDistributionTest is IMarketDistribution
     function claimReferralRewards(address account, uint256 referralShare) public override
     {
         require (distributionComplete, "Not complete");
-        claimReferralBonusCallAmount[account] = referralShare;
+        claimReferralRewardCallAmount[account] = referralShare;
     }
 }

@@ -276,7 +276,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
 
     function claim(address account) public override 
     {
-        require (distributionComplete, "Distribution is not complete");
+        require (distributionComplete, "Distribution is not completed");
         require (msg.sender == address(marketGeneration), "Unauthorized");
 
         if (totalOwed[account] == 0)
@@ -297,7 +297,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
 
     function claimReferralRewards(address account, uint256 referralShare) public override 
     {
-        require (distributionComplete, "Distribution is not complete");
+        require (distributionComplete, "Distribution is not completed");
         require (msg.sender == address(marketGeneration), "Unauthorized");
 
         uint256 share = referralShare.mul(totalBoughtForReferrals).div(marketGeneration.totalReferralPoints());

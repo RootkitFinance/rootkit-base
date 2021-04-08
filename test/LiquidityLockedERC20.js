@@ -13,7 +13,7 @@ describe("LiquidityLockedERC20", async function() {
         const liquidityLockedERC20Factory = await ethers.getContractFactory("LiquidityLockedERC20Test");
         liquidityLockedERC20 = await liquidityLockedERC20Factory.connect(owner).deploy();
         uniswap = await createUniswap(owner);
-        const baseTokenFactory = await ethers.getContractFactory("TetherTest");
+        const baseTokenFactory = await ethers.getContractFactory("ERC20Test");
         baseToken = await baseTokenFactory.connect(owner).deploy();
 
         await uniswap.factory.createPair(baseToken.address, liquidityLockedERC20.address);
@@ -24,7 +24,7 @@ describe("LiquidityLockedERC20", async function() {
         await pair.connect(user1).approve(uniswap.router.address, constants.MaxUint256);
         await liquidityLockedERC20.connect(owner).approve(uniswap.router.address, constants.MaxUint256);
         await liquidityLockedERC20.connect(user1).approve(uniswap.router.address, constants.MaxUint256);
-        await baseToken.connect(owner).transfer(user1.address, utils.parseEther("50"));
+        await baseToken.connect(owner).transfer(user1.address, utils.parseUnits("50"));
     })
 
     it("owner only functions can't be called by non-owners", async function() {
