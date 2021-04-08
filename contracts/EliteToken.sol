@@ -2,10 +2,9 @@
 pragma solidity ^0.7.4;
 
 import "./ERC31337.sol";
-import "./IEliteToken.sol";
 import "./IERC20.sol";
 
-contract EliteToken is ERC31337, IEliteToken
+contract EliteToken is ERC31337
 {
     using Address for address;
     using SafeMath for uint256;
@@ -63,10 +62,5 @@ contract EliteToken is ERC31337, IEliteToken
         _balanceOf[recipient] = _balanceOf[recipient].add(remaining);
         
         emit Transfer(sender, recipient, remaining);
-    }
-
-    function canRecoverTokens(IERC20 token) internal override view returns (bool) 
-    { 
-        return address(token) != address(this) && address(token) != address(this.wrappedToken()); 
     }
 }

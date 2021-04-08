@@ -13,6 +13,5 @@ interface IRootedPonzoMaBobber
     function addLiquidity(address eliteOrBase, uint256 baseAmount) external;
     function removeLiquidity(address eliteOrBase, uint256 tokens) external;    
     function buyRooted(address token, uint256 amountToSpend) external;
-    function sellRooted(address token, uint256 amountToSpend) external;
-    
+    function sellRooted(address token, uint256 amountToSpend) external;   
 }

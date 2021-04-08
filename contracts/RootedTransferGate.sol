@@ -15,7 +15,6 @@ It:
     Provides a safe and tax-free liquidity adding function
 */
 
-import "./Owned.sol";
 import "./Address.sol";
 import "./IUniswapV2Factory.sol";
 import "./IERC20.sol";
@@ -26,7 +25,6 @@ import "./SafeERC20.sol";
 import "./SafeMath.sol";
 import "./TokensRecoverable.sol";
 import "./ITransferGate.sol";
-import "./FeeSplitter.sol";
 
 contract RootedTransferGate is TokensRecoverable, ITransferGate
 {   
@@ -82,7 +80,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
 
     function setFreeParticipant(address participant, bool free) public
     {
-        require (msg.sender == owner || freeParticipantControllers[msg.sender], "Not an owner or free participant");
+        require (msg.sender == owner || freeParticipantControllers[msg.sender], "Not an owner or free participant controller");
         freeParticipant[participant] = free;
     }
 
@@ -101,7 +99,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     function setDumpTax(uint16 startTaxRate, uint256 durationInSeconds) public
     {
         require (feeControllers[msg.sender] || msg.sender == owner, "Not an owner or fee controller");
-        require (startTaxRate <= 2500, "Dump tax rate should be less than or equal to 25%");  // protecting everyone from Ponzo
+        require (startTaxRate <= 2500, "Dump tax rate should be less than or equal to 25%");
 
         dumpTaxStartRate = startTaxRate;
         dumpTaxDurationInSeconds = durationInSeconds;
@@ -121,15 +119,14 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     function setFees(uint16 _feesRate) public
     {
         require (feeControllers[msg.sender] || msg.sender == owner, "Not an owner or fee controller");
-        require (_feesRate <= 1000, "> 10%"); // protecting everyone from Ponzo
-        
+        require (_feesRate <= 1000, "> 10%");
         feesRate = _feesRate;
     }
     
     function setSellFees(uint16 _sellFeesRate) public
     {
         require (feeControllers[msg.sender] || msg.sender == owner, "Not an owner or fee controller");
-        require (_sellFeesRate <= 2500, "> 25%"); // protecting everyone from Ponzo
+        require (_sellFeesRate <= 2500, "> 25%");
         
         sellFeesRate = _sellFeesRate;
     }

@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: P-P-P-PONZO!!!
 pragma solidity ^0.7.4;
 
-import "./Owned.sol";
-import "./RootedToken.sol";
 import "./IMarketDistribution.sol";
 import "./IMarketGeneration.sol";
 import "./TokensRecoverable.sol";
 import "./SafeERC20.sol";
 import "./SafeMath.sol";
+import "./IERC20.sol";
 
 contract MarketGeneration is TokensRecoverable, IMarketGeneration
 {
@@ -25,15 +24,12 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     bool public isActive;
 
     IERC20 immutable baseToken;
-    RootedToken immutable rootedToken;
     IMarketDistribution public marketDistribution;
     uint256 refundsAllowedUntil;
-    uint256 totalRaised;
     uint8 constant public override buyRoundsCount = 3;
 
-    constructor (RootedToken _rootedToken, IERC20 _baseToken, address _devAddress)
+    constructor (IERC20 _baseToken, address _devAddress)
     {
-        rootedToken = _rootedToken;
         baseToken = _baseToken;
         devAddress = _devAddress;
     }
@@ -62,7 +58,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         refundsAllowedUntil = block.timestamp + 86400;
     }
 
-     function disableBuyRound(uint8 round, bool disabled) public ownerOnly() active()
+    function disableBuyRound(uint8 round, bool disabled) public ownerOnly() active()
     {
         require (round > 0 && round <= buyRoundsCount, "Round must be 1 to 3");
         disabledRounds[round] = disabled;
@@ -74,7 +70,6 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         isActive = false;
         if (baseToken.balanceOf(address(this)) == 0) { return; }
 
-        rootedToken.approve(address(marketDistribution), uint256(-1));
         baseToken.safeApprove(address(marketDistribution), uint256(-1));
 
         marketDistribution.distribute();
@@ -86,6 +81,33 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         refundsAllowedUntil = uint256(-1);
     }
 
+    function refund(uint256 amount) private
+    {
+        baseToken.safeTransfer(msg.sender, amount);
+            
+        totalContribution[msg.sender] = 0;           
+
+        for (uint8 round = 1; round <= buyRoundsCount; round++)
+        {
+            uint256 amountPerRound = contributionPerRound[msg.sender][round];
+            if (amountPerRound > 0)
+            {
+                contributionPerRound[msg.sender][round] = 0;
+                uint256 oldTotal = totalContributionPerRound[round];
+                uint256 newTotal = oldTotal - amountPerRound;
+                totalContributionPerRound[round] = newTotal;
+            }
+        }
+
+        uint256 refPoints = referralPoints[msg.sender];
+       
+        if (refPoints > 0)
+        {
+            totalReferralPoints = totalReferralPoints - refPoints;
+            referralPoints[msg.sender] = 0;
+        }
+    }
+
     function claim() public 
     {
         uint256 amount = totalContribution[msg.sender];
@@ -94,11 +116,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         
         if (refundsAllowedUntil > block.timestamp) 
         {
-            baseToken.safeTransfer(msg.sender, amount);
-            totalContribution[msg.sender] = 0;
-            contributionPerRound[msg.sender][1] = 0;
-            contributionPerRound[msg.sender][2] = 0;
-            contributionPerRound[msg.sender][3] = 0;
+            refund(amount);
         }
         else 
         {
@@ -106,9 +124,9 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         }
     }
 
-    function claimReferralBonus() public
+    function claimReferralRewards() public
     {
-        require (referralPoints[msg.sender] > 0, "No bonus to claim");
+        require (referralPoints[msg.sender] > 0, "No rewards to claim");
         
         uint256 refShare = referralPoints[msg.sender];
         referralPoints[msg.sender] = 0;
@@ -140,8 +158,6 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
 
             totalReferralPoints = totalReferralPoints + amount + amount;
         }
-
-        totalRaised = totalRaised + amount;
 
         uint256 oldContribution = totalContribution[msg.sender];
         uint256 newContribution = oldContribution + amount;

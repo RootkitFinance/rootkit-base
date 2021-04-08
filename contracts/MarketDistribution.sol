@@ -3,17 +3,15 @@ pragma solidity ^0.7.4;
 
 import "./IMarketDistribution.sol";
 import "./IMarketGeneration.sol";
-import "./Owned.sol";
 import "./RootedToken.sol";
 import "./RootedTransferGate.sol";
 import "./TokensRecoverable.sol";
 import "./SafeMath.sol";
-import "./EliteToken.sol";
+import "./IERC31337.sol";
 import "./IERC20.sol";
 import "./IUniswapV2Router02.sol";
 import "./IUniswapV2Factory.sol";
 import "./IUniswapV2Pair.sol";
-import "./IWrappedERC20.sol";
 import "./SafeERC20.sol";
 
 /*
@@ -63,31 +61,32 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
 
     bool public override distributionComplete;
 
+    IMarketGeneration immutable public marketGeneration;
     IUniswapV2Router02 immutable uniswapV2Router;
     IUniswapV2Factory immutable uniswapV2Factory;
-    RootedToken immutable rootedToken;
-    IERC31337 immutable eliteToken;
-    IERC20 immutable baseToken;
+    RootedToken immutable public rootedToken;
+    IERC31337 immutable public eliteToken;
+    IERC20 immutable public baseToken;
     address immutable devAddress;
 
-    IUniswapV2Pair rootedEliteLP;
-    IUniswapV2Pair rootedBaseLP;
+    IUniswapV2Pair public rootedEliteLP;
+    IUniswapV2Pair public rootedBaseLP;
 
     uint256 public totalBaseTokenCollected;
     mapping (uint8 => uint256) public totalRootedTokenBoughtPerRound;
-    mapping (address => uint256) public claimTime; // address > time    
+    mapping (address => uint256) public claimTime;
     mapping (address => uint256) public totalOwed;
     uint256 public totalBoughtForReferrals;
-    IMarketGeneration marketGeneration;
+    
     uint256 public recoveryDate = block.timestamp + 2592000; // 1 Month
     
-    uint16 constant public devCutPercent = 900; // 9%
+    uint16 constant public devCutPercent = 1000; // 10%
     uint16 constant public preBuyForReferralsPercent = 200; // 2%
-    uint16 constant public preBuyForMarketManipulationPercent = 900; // 9%
+    uint16 constant public preBuyForMarketManipulationPercent = 800; // 8%
     uint256 public override vestingPeriodStartTime;
     uint256 public override vestingPeriodEndTime; 
     uint256 public vestingDuration = 600000 seconds; // ~6.9 days
-    uint256 rootedBottom;
+    uint256 public rootedBottom;
 
     constructor(RootedToken _rootedToken, IERC31337 _eliteToken, IMarketGeneration _marketGeneration, IUniswapV2Router02 _uniswapV2Router, address _devAddress)
     {
@@ -124,7 +123,10 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     }
 
     function completeSetup() public ownerOnly()
-    {       
+    {   
+        require (address(rootedEliteLP) != address(0), "Rooted Elite pool is not created");
+        require (address(rootedBaseLP) != address(0), "Rooted Base pool is not created");   
+
         eliteToken.approve(address(uniswapV2Router), uint256(-1));
         rootedToken.approve(address(uniswapV2Router), uint256(-1));
         baseToken.safeApprove(address(uniswapV2Router), uint256(-1));
@@ -137,14 +139,11 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     {
         require (msg.sender == address(marketGeneration), "Unauthorized");
         require (!distributionComplete, "Distribution complete");
-        uint256 totalContributions = baseToken.balanceOf(address(marketGeneration));
-
-        require (totalContributions > 0, "Nothing to distribute");
-
+   
         vestingPeriodStartTime = block.timestamp;
         vestingPeriodEndTime = block.timestamp + vestingDuration;
         distributionComplete = true;
-        totalBaseTokenCollected = totalContributions;
+        totalBaseTokenCollected = baseToken.balanceOf(address(marketGeneration));
         baseToken.safeTransferFrom(msg.sender, address(this), totalBaseTokenCollected);  
 
         RootedTransferGate gate = RootedTransferGate(address(rootedToken.transferGate()));
@@ -155,12 +154,13 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         createRootedEliteLiquidity();
 
         eliteToken.sweepFloor(address(this));
-        eliteToken.depositTokens(baseToken.balanceOf(address(this)));  
 
-        uint256 devCut = totalBaseTokenCollected * devCutPercent / 10000;        
-        buyTheBottom(devCut); // dev cut is used for Tether stabilization fund. Original dev cut amount will be taken in the future
-
-        preBuyForMarketManipulation();
+        uint256 devCut = totalBaseTokenCollected * devCutPercent / 10000;
+        baseToken.safeTransfer(devAddress, devCut);
+        
+        eliteToken.depositTokens(baseToken.balanceOf(address(this)));
+                
+        buyTheBottom();        
         preBuyForReferrals();
         preBuyForGroups();
 
@@ -170,23 +170,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         createRootedBaseLiquidity();
 
         gate.setUnrestricted(false);
-    }
-    
-    function buyTheBottom(uint256 devCut) private
-    {
-        // dev cut is used for Tether stabilization fund. Original dev cut amount will be taken in the future
-        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(devCut, 0, eliteRootedPath(), address(this), block.timestamp);
-        rootedBottom = amounts[1];
-    }
-
-    function sellTheTop() private
-    {
-        // dev cut is used for Tether stabilization fund. Original dev cut amount will be taken in the future
-        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(rootedBottom, 0, rootedElitePath(), address(this), block.timestamp);
-        uint256 eliteAmount = amounts[1];
-        eliteToken.withdrawTokens(eliteAmount);
-        baseToken.safeTransfer(devAddress, eliteAmount);
-    }
+    }   
     
     function createRootedEliteLiquidity() private
     {
@@ -195,13 +179,23 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         uniswapV2Router.addLiquidity(address(eliteToken), address(rootedToken), eliteToken.balanceOf(address(this)), rootedToken.totalSupply(), 0, 0, address(this), block.timestamp);
     }
 
-    function preBuyForMarketManipulation() private 
+    function buyTheBottom() private
     {
         uint256 amount = totalBaseTokenCollected * preBuyForMarketManipulationPercent / 10000;  
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
         uint256 rootedAmout = amounts[1];
-        rootedToken.transfer(devAddress, rootedAmout); // send to Bobber
+        rootedToken.transfer(devAddress, rootedAmout.div(2));
+        rootedBottom = rootedToken.balanceOf(address(this));
     }
+
+    function sellTheTop() private
+    {
+        // Used for new stable coin stabilization fund.
+        uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(rootedBottom, 0, rootedElitePath(), address(this), block.timestamp);
+        uint256 eliteAmount = amounts[1];
+        eliteToken.withdrawTokens(eliteAmount);
+        baseToken.safeTransfer(devAddress, eliteAmount);
+    }   
     
     function preBuyForReferrals() private 
     {
@@ -220,7 +214,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
 
             if (roundBuy > 0)
             {   
-                uint256 eliteBalance = eliteToken.balanceOf(address(this));   
+                uint256 eliteBalance = eliteToken.balanceOf(address(this));
                 uint256 amount = roundBuy > eliteBalance ? eliteBalance : roundBuy;      
                 uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
                 totalRootedTokenBoughtPerRound[round] = amounts[1];
@@ -240,6 +234,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         
         eliteToken.withdrawTokens(baseAmount);
         uniswapV2Router.addLiquidity(address(baseToken), address(rootedToken), baseAmount, rootedAmount, 0, 0, address(this), block.timestamp);
+
         rootedBaseLP.transfer(devAddress, rootedBaseLP.balanceOf(address(this)));
         rootedEliteLP.transfer(devAddress, rootedEliteLP.balanceOf(address(this)));
     }
@@ -265,7 +260,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         uint256 total;
 
         for (uint8 round = 1; round <= marketGeneration.buyRoundsCount(); round++)
-        {           
+        {
             uint256 contribution = marketGeneration.contributionPerRound(account, round);
 
             if (contribution > 0)
@@ -273,14 +268,15 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
                 uint256 totalRound = marketGeneration.totalContributionPerRound(round);
                 uint256 share = contribution.mul(totalRootedTokenBoughtPerRound[round]) / totalRound;
                 total = total + share;
-            }           
+            }
         }
-
+        
         return total;
     }
 
     function claim(address account) public override 
     {
+        require (distributionComplete, "Distribution is not complete");
         require (msg.sender == address(marketGeneration), "Unauthorized");
 
         if (totalOwed[account] == 0)
@@ -288,19 +284,20 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
             totalOwed[account] = getTotalOwed(account);
         }
 
-        uint256 share = totalOwed[account];  
+        uint256 share = totalOwed[account];
         uint256 endTime = vestingPeriodEndTime > block.timestamp ? block.timestamp : vestingPeriodEndTime;
 
-        require (claimTime[account] <= endTime, "Already claimed");
+        require (claimTime[account] < endTime, "Already claimed");
 
         uint256 claimStartTime = claimTime[account] == 0 ? vestingPeriodStartTime : claimTime[account];
-        share = (endTime.sub(claimStartTime)).mul(share).div(vestingDuration);        
+        share = (endTime.sub(claimStartTime)).mul(share).div(vestingDuration);
         claimTime[account] = block.timestamp;
         rootedToken.transfer(account, share);
     }
 
     function claimReferralRewards(address account, uint256 referralShare) public override 
     {
+        require (distributionComplete, "Distribution is not complete");
         require (msg.sender == address(marketGeneration), "Unauthorized");
 
         uint256 share = referralShare.mul(totalBoughtForReferrals).div(marketGeneration.totalReferralPoints());

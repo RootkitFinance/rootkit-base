@@ -5,5 +5,5 @@ import "./IERC20.sol";
 
 interface IFloorCalculator
 {
-    function calculateSubFloor(IERC20 wrappedToken, IERC20 backingToken) external view returns (uint256);
+    function calculateSubFloor(IERC20 baseToken, IERC20 eliteToken) external view returns (uint256);
 }
