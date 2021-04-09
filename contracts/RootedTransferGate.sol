@@ -99,7 +99,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     function setDumpTax(uint16 startTaxRate, uint256 durationInSeconds) public
     {
         require (feeControllers[msg.sender] || msg.sender == owner, "Not an owner or fee controller");
-        require (startTaxRate <= 2500, "Dump tax rate should be less than or equal to 25%");
+        require (startTaxRate <= 2500, "Dump tax rate must be less than or equal to 25%");
 
         dumpTaxStartRate = startTaxRate;
         dumpTaxDurationInSeconds = durationInSeconds;
@@ -119,14 +119,14 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     function setFees(uint16 _feesRate) public
     {
         require (feeControllers[msg.sender] || msg.sender == owner, "Not an owner or fee controller");
-        require (_feesRate <= 1000, "> 10%");
+        require (_feesRate <= 1000, "Fee rate must be less than or equal to 10%");
         feesRate = _feesRate;
     }
     
     function setSellFees(uint16 _sellFeesRate) public
     {
         require (feeControllers[msg.sender] || msg.sender == owner, "Not an owner or fee controller");
-        require (_sellFeesRate <= 2500, "> 25%");
+        require (_sellFeesRate <= 2500, "Sell fee rate must be less than or equal to 25%");
         
         sellFeesRate = _sellFeesRate;
     }
