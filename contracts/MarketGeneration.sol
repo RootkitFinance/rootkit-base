@@ -19,7 +19,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     mapping (address => uint256) public override referralPoints; // address > amount
     mapping (uint8 => bool) public disabledRounds;
     uint256 public override totalReferralPoints;
-    address public devAddress;
+    address public immutable devAddress;
 
     bool public isActive;
 
@@ -27,6 +27,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     IMarketDistribution public marketDistribution;
     uint256 refundsAllowedUntil;
     uint8 constant public override buyRoundsCount = 3;
+    uint256 constant public hardCap = 1234567890000;
 
     constructor (IERC20 _baseToken, address _devAddress)
     {
@@ -93,9 +94,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
             if (amountPerRound > 0)
             {
                 contributionPerRound[msg.sender][round] = 0;
-                uint256 oldTotal = totalContributionPerRound[round];
-                uint256 newTotal = oldTotal - amountPerRound;
-                totalContributionPerRound[round] = newTotal;
+                totalContributionPerRound[round] -= amountPerRound;
             }
         }
 
@@ -103,7 +102,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
        
         if (refPoints > 0)
         {
-            totalReferralPoints = totalReferralPoints - refPoints;
+            totalReferralPoints -= refPoints;
             referralPoints[msg.sender] = 0;
         }
     }
@@ -137,39 +136,24 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     {
         require (round > 0 && round <= buyRoundsCount, "Round must be 1 to 3");
         require (!disabledRounds[round], "Round is disabled");
+        require (baseToken.balanceOf(address(this)) < hardCap, "Hard Cap reached");
 
         baseToken.safeTransferFrom(msg.sender, address(this), amount);
+
         if (referral == address(0) || referral == msg.sender) 
         {
-            uint256 oldReferralPoints = referralPoints[devAddress];
-            uint256 newReferralPoints = oldReferralPoints + amount;
-            referralPoints[devAddress] = newReferralPoints;
-            totalReferralPoints = totalReferralPoints + amount;
+            referralPoints[devAddress] +=amount;
+            totalReferralPoints += amount;
         }
         else 
         {
-            uint256 oldReferralPoints = referralPoints[msg.sender];
-            uint256 newReferralPoints = oldReferralPoints + amount;
-            referralPoints[msg.sender] = newReferralPoints;
-
-            oldReferralPoints = referralPoints[referral];
-            newReferralPoints = oldReferralPoints + amount;
-            referralPoints[referral] = newReferralPoints;
-
-            totalReferralPoints = totalReferralPoints + amount + amount;
+            referralPoints[msg.sender] += amount;
+            referralPoints[referral] += amount;
+            totalReferralPoints +=(amount + amount);
         }
 
-        uint256 oldContribution = totalContribution[msg.sender];
-        uint256 newContribution = oldContribution + amount;
-        totalContribution[msg.sender] = newContribution;
-
-        uint256 oldContributionPerRound = contributionPerRound[msg.sender][round];
-        uint256 newContributionPerRound = oldContributionPerRound + amount;
-        contributionPerRound[msg.sender][round] = newContributionPerRound;
-
-        uint256 oldTotal = totalContributionPerRound[round];
-        uint256 newTotal = oldTotal + amount;
-
-        totalContributionPerRound[round] = newTotal;
+        totalContribution[msg.sender] += amount;
+        contributionPerRound[msg.sender][round] += amount;
+        totalContributionPerRound[round] += amount;
     }
 }
