@@ -1,18 +1,19 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 
-/* ROOTKIT: The Age of Forks
-Intended use:
-- Raise any token using the MarketGeneration
-and MarketDistribution contract
+/* ROOTKIT: upTether
+
+An upToken is a token that gains in value
+against whatever token it is paired with.
+
+- Raise Tether using the Market Generation
+and Market Distribution contracts
+- An equal amount of upTether will be minted
 - combine with an ERC-31337 version of the 
 raised token.
+- Send LP tokens to the Liquidity Controller
+for efficent access to market features
 
-
-A Rooted Token is a token that gains in value
-against whatever token it is paired with. In
-some ways Rootkit.finance is just Rooted ETH. 
-Its time to ROOT EVERYTHING ON EVERY CHAIN!!
 */
 
 import "./LiquidityLockedERC20.sol";

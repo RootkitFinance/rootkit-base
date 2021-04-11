@@ -1,8 +1,8 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 
 /* ROOTKIT:
-A floor calculator to use with ERC31337 uniswap pairs
+A floor calculator to use with ERC31337 AMM pairs
 Ensures 100% of accessible funds are backed at all times
 */
 

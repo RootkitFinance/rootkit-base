@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 
 import "./ERC31337.sol";
@@ -10,7 +10,7 @@ contract EliteToken is ERC31337
     using SafeMath for uint256;
     
     mapping (address => bool) public freeParticipantControllers;
-    mapping (address => bool) public freeParticipants; // Free Participants are exempt from burn fee
+    mapping (address => bool) public freeParticipants; 
 
     mapping (address => bool) public burnRateControllers;
     uint16 burnRate;   

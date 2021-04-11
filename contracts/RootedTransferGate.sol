@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 pragma experimental ABIEncoderV2;
 
@@ -7,12 +7,13 @@ A transfer gate (GatedERC20) for use with RootKit tokens
 
 It:
     Allows customization of tax and burn rates
-    Allows transfer to/from approved Uniswap pools
-    Disallows transfer to/from non-approved Uniswap pools
+    Allows transfer to/from approved pools
+    Disallows transfer to/from non-approved pools
     Allows transfer to/from anywhere else
     Allows for free transfers if permission granted
     Allows for unrestricted transfers if permission granted
-    Provides a safe and tax-free liquidity adding function
+    Allows for a pool to have an extra tax
+    Allows for a temporary declining tax
 */
 
 import "./Address.sol";

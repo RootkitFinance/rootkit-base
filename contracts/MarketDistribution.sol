@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 
 import "./IMarketDistribution.sol";
@@ -16,25 +16,20 @@ import "./SafeERC20.sol";
 
 /*
 Introducing the Market Generation Event:
-TLDR: we create the market with all raised funds,
-then use the same funds to buy from the market
-and distribute to contributers. ERC31337 lets
-anyone use the same ETH multiple times under 
-some conditions.
 
-Allows full and permanent liquidity locking of
-all raised funds AND no commitment to LPs. Using
-ERC-31337 we get ALL the raised funds back from 
-liquidity if we lock all the raised token with
-all the supply of the new token.
+Allows full and permanent liquidity locking
+of all raised funds with no commitment to LPs. 
+Using ERC-31337 we get ALL the raised funds
+back from liquidity if we lock all the raised
+token with all the supply of the new token and
+there is no ability to mint.
+
 - Raise with any token
 - All raised funds get locked forever
-- users choose a buy group when they contribute
-- (r1 75% to liq / 20% buy) (r2 50% liq / 50% % buy)
-- (r1 75% to liq / 20% buy) (r2 50% liq / 50% % buy)
-- multiple group buys before the market opens
-- perma lock more into liquidity for earlier groups
-
+- ERC-31337 sweeps back all locked value
+- Recovered value buys from the new market
+- Any length vesting period
+- Built in referral system
 
 Phases:
     Initializing
@@ -46,9 +41,9 @@ Phases:
         Transfer all rootedToken to this contract
         Take all BaseToken + rootedToken and create a market
         Sweep the floor
-        Buy rootedToken for the group
+        Buy rootedToken for the groups
         Move liquidity from elite pool to create standard pool
-        Distribute funds
+        Begin the vesting period with a linier unlock
 
     Complete
         Everyone can call claim() to receive their tokens (via the liquidity generation contract)
@@ -164,7 +159,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         preBuyForReferrals();
         preBuyForGroups();
 
-        eliteToken.transfer(devAddress, eliteToken.balanceOf(address(this))); // pump fund, send direct to bobber in future
+        eliteToken.transfer(devAddress, eliteToken.balanceOf(address(this))); // upFund, send direct to Liquidity Controller in future
 
         sellTheTop(); 
         createRootedBaseLiquidity();
@@ -190,7 +185,6 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
 
     function sellTheTop() private
     {
-        // Used for new stable coin stabilization fund.
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(rootedBottom, 0, rootedElitePath(), address(this), block.timestamp);
         uint256 eliteAmount = amounts[1];
         eliteToken.withdrawTokens(eliteAmount);
@@ -199,7 +193,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     
     function preBuyForReferrals() private 
     {
-        uint256 amount = totalBaseTokenCollected * preBuyForReferralsPercent / 10000; // buy at best possible price to feed the shillage.
+        uint256 amount = totalBaseTokenCollected * preBuyForReferralsPercent / 10000;
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
         totalBoughtForReferrals = amounts[1];
     }

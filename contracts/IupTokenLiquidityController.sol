@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 
-interface IRootedPonzoMaBobber
+interface IupTokenLiquidityController
 {
     function pumpItPonzo (uint256 PUMPIT, address token, uint16 tax, uint256 time) external;
     function pumpRooted(address token, uint256 amountToSpend, uint16 tax, uint256 time) external;

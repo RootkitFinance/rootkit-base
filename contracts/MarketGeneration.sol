@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 
 import "./IMarketDistribution.sol";
@@ -13,10 +13,10 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    mapping (address => mapping (uint8 => uint256)) public override contributionPerRound; // address > round > amount 
-    mapping (address => uint256) public override totalContribution; // address > amount 
-    mapping (uint8 => uint256) public override totalContributionPerRound; // total contributed to each buy round
-    mapping (address => uint256) public override referralPoints; // address > amount
+    mapping (address => mapping (uint8 => uint256)) public override contributionPerRound;
+    mapping (address => uint256) public override totalContribution;
+    mapping (uint8 => uint256) public override totalContributionPerRound;
+    mapping (address => uint256) public override referralPoints;
     mapping (uint8 => bool) public disabledRounds;
     uint256 public override totalReferralPoints;
     address public immutable devAddress;

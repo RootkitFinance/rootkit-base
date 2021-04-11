@@ -1,9 +1,5 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
-
-/* ROOTKIT:
-O wherefore art thou 8 point O
-*/
 
 library SafeMath 
 {

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 pragma experimental ABIEncoderV2;
 
@@ -15,8 +15,8 @@ contract FeeSplitter is TokensRecoverable
     using SafeERC20 for IERC20;
     using Address for address;
     
-    uint256 devRateMin = 1000;  // 10% of overall fees
-    uint256 rootRateMin = 1000; // 10% of overall fees
+    uint256 devRateMin = 1000;  
+    uint256 rootRateMin = 1000; 
     address public devAddress;
     address public immutable deployerAddress;
     address public rootFeederAddress;

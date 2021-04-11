@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: P-P-P-PONZO!!!
+// SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
 
 import "./Owned.sol";
@@ -12,31 +12,13 @@ import "./RootedTransferGate.sol";
 import "./UniswapV2Library.sol";
 import "./EliteToken.sol";
 import "./SafeMath.sol";
-import "./IRootedPonzoMaBobber.sol";
+import "./IupTokenLiquidityController.sol";
 import "./IERC31337.sol";
 import "./IFloorCalculator.sol";
 
 
-contract RootedPonzoMaBobber is TokensRecoverable, IRootedPonzoMaBobber
+contract upTokenLiquidityController is TokensRecoverable, IupTokenLiquidityController
 
-    /*
-        Rooted-Ponzo-Ma-BobberV69.sol
-        Status: Fully functional Rooted /GOTEAM edition     
-        Calibration: Fork machine gun compatible
-        
-        The Ponzo-Ma-Bobber is a contract with access to critical system control
-        functions and liquidity tokens for ERC31337 / rooted token sets. it uses
-        the ERC-31337 sweeper functionality to streamline forced unit-value gain
-
-        /GOTEAM edition:
-        Includes some public functions that can benefit the user and the market.
-
-        - buyFromElite, wraps users BASE token => ELITE token and buys ROOTED Token
-          sellToElite, wraps users BASE token => ELITE token and buys ROOTED Token
-        - balance pools, brings the prices of both pools into alignment.
-
-        Created by @ProfessorPonzo
-    */
 
 {
     using SafeMath for uint256;
@@ -103,33 +85,35 @@ contract RootedPonzoMaBobber is TokensRecoverable, IRootedPonzoMaBobber
         elite.withdrawTokens(eliteAmount);
         uniswapV2Router.addLiquidity(address(base), address(rooted), eliteAmount, rootedAmount, 0, 0, address(this), block.timestamp);
     }
-        // The Pump Button is really fun
+
     function setInfinitePumper(address pumper, bool infinite) public ownerOnly() {
         infinitePumpers[pumper] = infinite;
     }
-        // Removes liquidity and buys from either pool 
+        // Removes liquidity and buys from either pool and sets a temporary dump tax
     function pumpItPonzo (uint256 PUMPIT, address token, uint16 tax, uint256 time) public override {
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         gate.setUnrestricted(true);
         PUMPIT = removeLiq(token, PUMPIT);
         buyRootedToken(token, PUMPIT);
         gate.setDumpTax(tax, time);
         gate.setUnrestricted(false);
     }
-    function pumpRooted(address token, uint256 amountToSpend, uint16 tax, uint256 time) public override { //setDumpTax(uint16 _startTaxRate, uint256 _durationInSeconds)
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+
+        // Uses value in the controller to buy 
+    function pumpRooted(address token, uint256 amountToSpend, uint16 tax, uint256 time) public override {
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         buyRootedToken(token, amountToSpend);
         gate.setDumpTax(tax, time);
     }
 
         // Sweeps the Base token under the floor to this address
     function sweepTheFloor() public override {
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         elite.sweepFloor(address(this));
     }
         // Move liquidity from Elite pool --->> Base pool
     function zapEliteToBase(uint256 liquidity) public override {
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         gate.setUnrestricted(true);
         liquidity = removeLiq(address(elite), liquidity);
         elite.withdrawTokens(liquidity);
@@ -138,7 +122,7 @@ contract RootedPonzoMaBobber is TokensRecoverable, IRootedPonzoMaBobber
     }
         // Move liquidity from Base pool --->> Elite pool
     function zapBaseToElite(uint256 liquidity) public override {
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         gate.setUnrestricted(true);
         liquidity = removeLiq(address(base), liquidity);
         elite.depositTokens(liquidity);
@@ -146,31 +130,31 @@ contract RootedPonzoMaBobber is TokensRecoverable, IRootedPonzoMaBobber
         gate.setUnrestricted(false);
     }
     function wrapToElite(uint256 baseAmount) public override {
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         elite.depositTokens(baseAmount);
     }
     function unwrapElite(uint256 eliteAmount) public override {
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         elite.withdrawTokens(eliteAmount);
     }
     function addLiquidity(address eliteOrBase, uint256 baseAmount) public override {
         gate.setUnrestricted(true);
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         addLiq(eliteOrBase, baseAmount);
         gate.setUnrestricted(false);
     }
     function removeLiquidity (address eliteOrBase, uint256 tokens) public override {
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         gate.setUnrestricted(true);
         removeLiq(eliteOrBase, tokens);
         gate.setUnrestricted(false);
     }
     function buyRooted(address token, uint256 amountToSpend) public override {
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         buyRootedToken(token, amountToSpend);
     }
     function sellRooted(address token, uint256 amountToSpend) public override {
-        require (msg.sender == owner || infinitePumpers[msg.sender], "You Wish!!!");
+        require (msg.sender == owner || infinitePumpers[msg.sender], "Not an owner or Liquidity Controller");
         sellRootedToken(token, amountToSpend);
     }
     function addLiq(address eliteOrBase, uint256 baseAmount) internal {
