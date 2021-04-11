@@ -3,7 +3,7 @@ pragma solidity ^0.7.4;
 pragma experimental ABIEncoderV2;
 
 /* ROOTKIT:
-A transfer gate (GatedERC20) for use with RootKit tokens
+A transfer gate (GatedERC20) for use with upTokens
 
 It:
     Allows customization of tax and burn rates
