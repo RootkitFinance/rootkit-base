@@ -23,22 +23,31 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
 
     bool public isActive;
 
-    IERC20 immutable baseToken;
+    IERC20 public baseToken;
+    IUniswapV2Router02 uniswapV2Router;
     IMarketDistribution public marketDistribution;
-    uint256 refundsAllowedUntil;
-    uint8 constant public override buyRoundsCount = 3;
-    uint256 constant public hardCap = 1234567890000;
+    uint256 public refundsAllowedUntil;
+    uint8 public override buyRoundsCount;
+    uint256 public hardCap;
 
-    constructor (IERC20 _baseToken, address _devAddress)
+    constructor ()
     {
-        baseToken = _baseToken;
-        devAddress = _devAddress;
+        devAddress = msg.sender;
     }
 
     modifier active()
     {
         require (isActive, "Distribution not active");
         _;
+    }
+
+    function calibrate(IERC20 _baseToken, uint256 _buyRoundsCount, uint256 _hardCap, IUniswapV2Router02 _uniswapV2Router) public ownerOwnly()
+    {
+        require (!isActive && block.timestamp >= refundsAllowedUntil, "Already activated");
+        baseToken = _baseToken;
+        buyRoundsCount = _buyRoundsCount;
+        hardCap = _hardCap;
+        uniswapV2Router = _uniswapV2Router;
     }
 
     function activate(IMarketDistribution _marketDistribution) public ownerOnly()
@@ -134,7 +143,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
 
     function contribute(uint256 amount, uint8 round, address referral) public active() 
     {
-        require (round > 0 && round <= buyRoundsCount, "Round must be 1 to 3");
+        require (round > 0 && round <= buyRoundsCount, "Buy Round does not exist");
         require (!disabledRounds[round], "Round is disabled");
         require (baseToken.balanceOf(address(this)) < hardCap, "Hard Cap reached");
 

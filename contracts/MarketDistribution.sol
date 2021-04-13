@@ -57,11 +57,11 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     bool public override distributionComplete;
 
     IMarketGeneration immutable public marketGeneration;
-    IUniswapV2Router02 immutable uniswapV2Router;
-    IUniswapV2Factory immutable uniswapV2Factory;
-    RootedToken immutable public rootedToken;
-    IERC31337 immutable public eliteToken;
-    IERC20 immutable public baseToken;
+    IUniswapV2Router02 uniswapV2Router;
+    IUniswapV2Factory uniswapV2Factory;
+    RootedToken public rootedToken;
+    IERC31337 public eliteToken;
+    IERC20 public baseToken;
     address immutable devAddress;
 
     IUniswapV2Pair public rootedEliteLP;
@@ -74,27 +74,40 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
     uint256 public totalBoughtForReferrals;
     
     uint256 public recoveryDate = block.timestamp + 2592000; // 1 Month
-    
     uint16 constant public devCutPercent = 1000; // 10%
-    uint16 constant public preBuyForReferralsPercent = 200; // 2%
-    uint16 constant public preBuyForMarketManipulationPercent = 800; // 8%
+    uint16 public preBuyForReferralsPercent;
+    uint16 public preBuyForMarketStabilizationPercent;
     uint256 public override vestingPeriodStartTime;
     uint256 public override vestingPeriodEndTime; 
-    uint256 public vestingDuration = 600000 seconds; // ~6.9 days
+    uint256 public vestingDuration; 
+    uint256 public buyRoundIncrement;
+    uint256 public initialBuyRoundPercent; 
     uint256 public rootedBottom;
 
-    constructor(RootedToken _rootedToken, IERC31337 _eliteToken, IMarketGeneration _marketGeneration, IUniswapV2Router02 _uniswapV2Router, address _devAddress)
+    constructor(IMarketGeneration _marketGeneration, IUniswapV2Router02 _uniswapV2Router, address _devAddress)
     {
-        require (address(_rootedToken) != address(0));
-
-        rootedToken = _rootedToken;        
-        eliteToken = _eliteToken;
         uniswapV2Router = _uniswapV2Router;
         marketGeneration = _marketGeneration;
-
         uniswapV2Factory = IUniswapV2Factory(_uniswapV2Router.factory());
-        baseToken = _eliteToken.wrappedToken();
         devAddress = _devAddress;
+    }
+
+    function calibrate(RootedToken _rootedToken, IERC31337 _eliteToken, uint256 _buyRoundIncrement, uint256 _vestingDuration, uint16 _preBuyForReferralsPercent, uint16 _preBuyForMarketStabilizationPercent, uint256 _initialBuyRoundPercent) public ownerOwnly()
+    {
+        uint256 buyRounds = marketGeneration.buyRoundsCount();
+        require ( buyRounds != 0 && buyRounds * _buyRoundIncrement + _initialBuyRoundPercent < 9000, "Buy round not set in generation or buyRoundIncrement set too high");
+        require ( _vestingDuration < 10000001, "4 month max vesting length");
+        require ( _preBuyForReferralsPercent < 500, "Max of 5% for referral buy");
+        require ( _preBuyForMarketStabilizationPercent < 1000, "Max of 10% for Stabilization");
+        eliteToken = _eliteToken;
+        baseToken = _eliteToken.wrappedToken();
+        require ( baseToken != address(0), "Incorrect elite token");
+        rootedToken = _rootedToken;
+        buyRoundIncrement = _buyRoundIncrement;
+        vestingDuration = _vestingDuration;
+        preBuyForReferralsPercent = _preBuyForReferralsPercent;
+        preBuyForMarketStabilizationPercent = _preBuyForMarketStabilizationPercent;
+        initialBuyRoundPercent = _initialBuyRoundPercent;
     }
 
     function setupEliteRooted() public
@@ -159,7 +172,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         preBuyForReferrals();
         preBuyForGroups();
 
-        eliteToken.transfer(devAddress, eliteToken.balanceOf(address(this))); // upFund, send direct to Liquidity Controller in future
+        eliteToken.transfer(devAddress, eliteToken.balanceOf(address(this)));
 
         sellTheTop(); 
         createRootedBaseLiquidity();
@@ -176,7 +189,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
 
     function buyTheBottom() private
     {
-        uint256 amount = totalBaseTokenCollected * preBuyForMarketManipulationPercent / 10000;  
+        uint256 amount = totalBaseTokenCollected * preBuyForMarketStabilizationPercent / 10000;  
         uint256[] memory amounts = uniswapV2Router.swapExactTokensForTokens(amount, 0, eliteRootedPath(), address(this), block.timestamp);
         uint256 rootedAmout = amounts[1];
         rootedToken.transfer(devAddress, rootedAmout.div(2));
@@ -203,7 +216,7 @@ contract MarketDistribution is TokensRecoverable, IMarketDistribution
         for (uint8 round = 1; round <= marketGeneration.buyRoundsCount(); round++)
         {
             uint256 totalRound = marketGeneration.totalContributionPerRound(round);
-            uint256 buyPercent = round * 3000; // 10000 = 100%
+            uint256 buyPercent = round * buyRoundIncrement + initialBuyRoundPercent; // 10000 = 100%
             uint256 roundBuy = totalRound * buyPercent / 10000;
 
             if (roundBuy > 0)
