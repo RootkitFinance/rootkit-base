@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: U-U-U-UPPPPP!!!
 pragma solidity ^0.7.4;
-interface IupTokenLiquidityController
+
+interface ILiquidityController
 {
-    function upUpUp (uint256 amount, address token, uint16 tax, uint256 time) external;
-    function upUp(address token, uint256 amountToSpend, uint16 tax, uint256 time) external;
-    function sweepTheFloor() external;
+    function balancePriceBase(uint256 amount) external;
+    function balancePriceElite(uint256 amount) external;   
+    function moveAvailableLiquidity() external;
+    function removeBuyAndTax(uint256 amount, address token, uint16 tax, uint256 time) external;
+    function buyAndTax(address token, uint256 amountToSpend, uint16 tax, uint256 time) external;
+    function sweepFloor() external;
     function zapEliteToBase(uint256 liquidity) external;
     function zapBaseToElite(uint256 liquidity) external;
     function wrapToElite(uint256 baseAmount) external;

@@ -39,7 +39,7 @@ contract MarketDistributionTest is IMarketDistribution
     function claim(address account) public override
     {
         require (distributionComplete, "Not complete");
-        claimCallAmount[account] = marketGeneration.totalContribution(account);
+        claimCallAmount[account] = marketGeneration.contribution(account);
     }
 
     function claimReferralRewards(address account, uint256 referralShare) public override

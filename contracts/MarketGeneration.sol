@@ -13,26 +13,22 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
     using SafeERC20 for IERC20;
     using SafeMath for uint256;
 
-    mapping (address => mapping (uint8 => uint256)) public override contributionPerRound;
-    mapping (address => uint256) public override totalContribution;
-    mapping (uint8 => uint256) public override totalContributionPerRound;
+    mapping (address => uint256) public override contribution;
     mapping (address => uint256) public override referralPoints;
-    mapping (uint8 => bool) public disabledRounds;
     uint256 public override totalReferralPoints;
-    address public immutable devAddress;
+    uint256 public override totalContribution;
+    address public immutable devAddress;    
 
     bool public isActive;
 
     IERC20 public baseToken;
-    IUniswapV2Router02 uniswapV2Router;
     IMarketDistribution public marketDistribution;
     uint256 public refundsAllowedUntil;
-    uint8 public override buyRoundsCount;
     uint256 public hardCap;
 
-    constructor ()
+    constructor(address _devAddress)
     {
-        devAddress = msg.sender;
+        devAddress = _devAddress;
     }
 
     modifier active()
@@ -41,13 +37,11 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         _;
     }
 
-    function calibrate(IERC20 _baseToken, uint256 _buyRoundsCount, uint256 _hardCap, IUniswapV2Router02 _uniswapV2Router) public ownerOwnly()
+    function init(IERC20 _baseToken, uint256 _hardCap) public ownerOnly()
     {
         require (!isActive && block.timestamp >= refundsAllowedUntil, "Already activated");
         baseToken = _baseToken;
-        buyRoundsCount = _buyRoundsCount;
         hardCap = _hardCap;
-        uniswapV2Router = _uniswapV2Router;
     }
 
     function activate(IMarketDistribution _marketDistribution) public ownerOnly()
@@ -66,12 +60,6 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
 
         // Give everyone 1 day to claim refunds if they don't approve of the new distributor
         refundsAllowedUntil = block.timestamp + 86400;
-    }
-
-    function disableBuyRound(uint8 round, bool disabled) public ownerOnly() active()
-    {
-        require (round > 0 && round <= buyRoundsCount, "Round must be 1 to 3");
-        disabledRounds[round] = disabled;
     }
 
     function complete() public ownerOnly() active()
@@ -93,22 +81,12 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
 
     function refund(uint256 amount) private
     {
-        baseToken.safeTransfer(msg.sender, amount);
-            
-        totalContribution[msg.sender] = 0;           
+        baseToken.safeTransfer(msg.sender, amount);       
+        totalContribution -= amount;
+        contribution[msg.sender] = 0;
 
-        for (uint8 round = 1; round <= buyRoundsCount; round++)
-        {
-            uint256 amountPerRound = contributionPerRound[msg.sender][round];
-            if (amountPerRound > 0)
-            {
-                contributionPerRound[msg.sender][round] = 0;
-                totalContributionPerRound[round] -= amountPerRound;
-            }
-        }
+       uint256 refPoints = referralPoints[msg.sender];
 
-        uint256 refPoints = referralPoints[msg.sender];
-       
         if (refPoints > 0)
         {
             totalReferralPoints -= refPoints;
@@ -118,7 +96,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
 
     function claim() public 
     {
-        uint256 amount = totalContribution[msg.sender];
+        uint256 amount = contribution[msg.sender];
 
         require (amount > 0, "Nothing to claim");
         
@@ -141,11 +119,9 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
         marketDistribution.claimReferralRewards(msg.sender, refShare);
     }
 
-    function contribute(uint256 amount, uint8 round, address referral) public active() 
+    function contribute(uint256 amount, address referral) public active() 
     {
-        require (round > 0 && round <= buyRoundsCount, "Buy Round does not exist");
-        require (!disabledRounds[round], "Round is disabled");
-        require (baseToken.balanceOf(address(this)) < hardCap, "Hard Cap reached");
+        require (totalContribution < hardCap, "Hard Cap reached");
 
         baseToken.safeTransferFrom(msg.sender, address(this), amount);
 
@@ -161,8 +137,7 @@ contract MarketGeneration is TokensRecoverable, IMarketGeneration
             totalReferralPoints +=(amount + amount);
         }
 
-        totalContribution[msg.sender] += amount;
-        contributionPerRound[msg.sender][round] += amount;
-        totalContributionPerRound[round] += amount;
+        contribution[msg.sender] += amount;
+        totalContribution += amount;
     }
 }
