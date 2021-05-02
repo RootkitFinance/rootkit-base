@@ -91,7 +91,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         unrestricted = _unrestricted;
         rootedToken.setLiquidityLock(mainPool, !_unrestricted);
     }
-    
+
     function setMainPool(IUniswapV2Pair _mainPool) public ownerOnly()
     {
         mainPool = _mainPool;
@@ -141,7 +141,10 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
 
         if (poolTaxRate > feesRate) 
         {
-            return amount * poolTaxRate / 10000 + amount * getDumpTax() / 10000;
+            uint256 dumpTax = getDumpTax();
+            uint256 totalTax = dumpTax + poolTaxRate;
+
+            return totalTax >= 10000 ? amount : amount * totalTax / 10000;
         }
 
         return amount * feesRate / 10000;
