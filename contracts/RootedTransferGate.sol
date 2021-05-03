@@ -141,8 +141,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
 
         if (poolTaxRate > feesRate) 
         {
-            uint256 dumpTax = getDumpTax();
-            uint256 totalTax = dumpTax + poolTaxRate;
+            uint256 totalTax = getDumpTax() + poolTaxRate;
 
             return totalTax >= 10000 ? amount : amount * totalTax / 10000;
         }
