@@ -22,8 +22,8 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
     IERC31337 immutable elite;
     IERC20 immutable rootedEliteLP;
     IERC20 immutable rootedBaseLP;
-    IFloorCalculator immutable calculator;
-    RootedTransferGate immutable gate;
+    IFloorCalculator public calculator;
+    RootedTransferGate public gate;
     mapping(address => bool) public liquidityControllers;
 
     constructor(IUniswapV2Router02 _uniswapV2Router, IERC20 _base, IERC20 _rooted, IERC31337 _elite, IFloorCalculator _calculator, RootedTransferGate _gate) 
@@ -39,6 +39,7 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
         uniswapV2Factory = _uniswapV2Factory;        
         
         _base.approve(address(_uniswapV2Router), uint256(-1));
+        _base.approve(address(_elite), uint256(-1));
         _rooted.approve(address(_uniswapV2Router), uint256(-1));
         IERC20 _rootedBaseLP = IERC20(_uniswapV2Factory.getPair(address(_base), address(_rooted)));
         _rootedBaseLP.approve(address(_uniswapV2Router), uint256(-1));
@@ -61,6 +62,12 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
         liquidityControllers[controlAddress] = controller;
     }
 
+    function setCalculatorAndGate(IFloorCalculator _calculator, RootedTransferGate _gate) public ownerOnly()
+    {
+        calculator = _calculator;
+        gate = _gate;
+    }
+
     // Use Base tokens held by this contract to buy from the Base Pool and sell in the Elite Pool
     function balancePriceBase(uint256 amount) public override liquidityControllerOnly()
     {
@@ -75,16 +82,6 @@ contract LiquidityController is TokensRecoverable, ILiquidityController
         elite.depositTokens(amount);
         amount = buyRootedToken(address(elite), amount);
         amount = sellRootedToken(address(base), amount);
-    }
-
-    // moves available liquidity from Elite pool to Base pool, sweep should be called first
-    function moveAvailableLiquidity() public override liquidityControllerOnly()
-    {
-        uint256 elitePerLpToken = elite.balanceOf(address(rootedEliteLP)).mul(1e18).div(rootedEliteLP.totalSupply());
-        uint256 lpToMove = base.balanceOf(address(elite)).mul(1e18).div(elitePerLpToken);
-        (uint256 eliteAmount, uint256 rootedAmount) = uniswapV2Router.removeLiquidity(address(elite), address(rooted), lpToMove, 0, 0, address(this), block.timestamp);
-        elite.withdrawTokens(eliteAmount);
-        uniswapV2Router.addLiquidity(address(base), address(rooted), eliteAmount, rootedAmount, 0, 0, address(this), block.timestamp);
     }
 
     // Removes liquidity, buys from either pool, sets a temporary dump tax
