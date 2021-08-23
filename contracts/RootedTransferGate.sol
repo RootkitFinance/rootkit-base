@@ -26,6 +26,7 @@ import "./SafeERC20.sol";
 import "./SafeMath.sol";
 import "./TokensRecoverable.sol";
 import "./ITransferGate.sol";
+import "./FreeParticipantRegistry.sol";
 
 contract RootedTransferGate is TokensRecoverable, ITransferGate
 {   
@@ -47,6 +48,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     address public override feeSplitter;
     uint16 public feesRate;
     IUniswapV2Pair public mainPool;
+    FreeParticipantRegistry public freeParticipantRegistry;
    
     uint16 public dumpTaxStartRate; 
     uint256 public dumpTaxDurationInSeconds;
@@ -66,7 +68,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
 
     function setFreeParticipantController(address freeParticipantController, bool allow) public ownerOnly()
     {
-        freeParticipantControllers[freeParticipantController] = allow;
+        freeParticipantRegistry.setFreeParticipantController(freeParticipantController, allow);
     }
 
     function setFeeControllers(address feeController, bool allow) public ownerOnly()
@@ -77,12 +79,12 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
     function setFeeSplitter(address _feeSplitter) public ownerOnly()
     {
         feeSplitter = _feeSplitter;
-    }
+    }    
 
     function setFreeParticipant(address participant, bool free) public
     {
-        require (msg.sender == owner || freeParticipantControllers[msg.sender], "Not an owner or free participant controller");
-        freeParticipant[participant] = free;
+        require (msg.sender == owner || freeParticipantRegistry.freeParticipantControllers(msg.sender), "Not an owner or free participant controller");
+        freeParticipantRegistry.setFreeParticipant(participant, free);
     }
 
     function setUnrestricted(bool _unrestricted) public
@@ -90,6 +92,11 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
         require (unrestrictedControllers[msg.sender], "Not an unrestricted controller");
         unrestricted = _unrestricted;
         rootedToken.setLiquidityLock(mainPool, !_unrestricted);
+    }
+
+    function setFreeParticipantRegistry(FreeParticipantRegistry _freeParticipantRegistry) public ownerOnly()
+    {
+        freeParticipantRegistry = _freeParticipantRegistry;
     }
 
     function setMainPool(IUniswapV2Pair _mainPool) public ownerOnly()
@@ -132,7 +139,7 @@ contract RootedTransferGate is TokensRecoverable, ITransferGate
 
     function handleTransfer(address, address from, address to, uint256 amount) public virtual override returns (uint256)
     {
-        if (unrestricted || freeParticipant[from] || freeParticipant[to]) 
+        if (unrestricted || freeParticipantRegistry.freeParticipant(from) || freeParticipantRegistry.freeParticipant(to))
         {
             return 0;
         }
